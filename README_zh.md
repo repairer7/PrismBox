@@ -12,6 +12,49 @@
 
 [English Documentation](README.md)
 
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="PrismBox 仪表盘预览" width="100%" />
+</p>
+
+---
+
+## 📸 界面预览
+
+### 📊 运行情况（仪表盘）
+实时系统监控、CPU 与内存利用率、60 秒动态流量折线图以及 sing-box 内核运行状态监控与热重启。
+
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="运行情况" width="100%" />
+</p>
+
+### 🌐 出口节点与策略组
+多协议节点卡片、Selector（手动切换）与 URLTest（自动优选）策略组、原生网络延迟测速及多源订阅管理。
+
+<p align="center">
+  <img src="docs/images/outbounds.png" alt="出口节点" width="100%" />
+</p>
+
+### 🔀 分流配置与远程规则集
+协议嗅探开关、解析域名覆盖目标 IP、域名解析策略、自定义分流规则列表以及 `.srs` 远程规则集管理。
+
+<p align="center">
+  <img src="docs/images/routing.png" alt="分流配置" width="100%" />
+</p>
+
+### 📥 入口方式
+TProxy 透明代理入站（默认端口 `12345`）、TUN 虚拟网卡以及 Mixed 混合入站监听配置。
+
+<p align="center">
+  <img src="docs/images/inbounds.png" alt="入口方式" width="100%" />
+</p>
+
+### 🛡️ DNS 配置
+自定义加密上游 DNS 服务器、智能分流解析规则、或完全关闭委托底层系统解析（避免路由回环）。
+
+<p align="center">
+  <img src="docs/images/dns.png" alt="DNS 配置" width="100%" />
+</p>
+
 ---
 
 ## ✨ 核心特性

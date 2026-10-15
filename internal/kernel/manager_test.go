@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/prismbox/prismbox/internal/config"
 )
@@ -157,10 +158,17 @@ func TestLogRingBuffer(t *testing.T) {
 		t.Fatalf("expected 5 lines, got %d", len(logsRecent))
 	}
 
-	// Verify listener received messages
-	receivedMu.Lock()
-	recCount := len(received)
-	receivedMu.Unlock()
+	// Verify listener received messages (wait up to 1s for asynchronous dispatch goroutines)
+	var recCount int
+	for attempt := 0; attempt < 50; attempt++ {
+		receivedMu.Lock()
+		recCount = len(received)
+		receivedMu.Unlock()
+		if recCount >= 1000 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	if recCount < 1000 {
 		t.Errorf("expected listener to receive at least 1000 lines, got %d", recCount)
 	}

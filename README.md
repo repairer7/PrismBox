@@ -12,6 +12,49 @@
 
 [中文文档](README_zh.md)
 
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="PrismBox Dashboard Preview" width="100%" />
+</p>
+
+---
+
+## 📸 Screenshots
+
+### 📊 Dashboard
+Real-time system telemetry, CPU & memory gauges, 60-second live traffic telemetry, and kernel lifecycle controls.
+
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="Dashboard" width="100%" />
+</p>
+
+### 🌐 Outbound Proxies & Policy Groups
+Multi-protocol proxy node cards, Selector and URLTest auto-fallback policy groups, native latency testing, and subscription updater.
+
+<p align="center">
+  <img src="docs/images/outbounds.png" alt="Outbounds" width="100%" />
+</p>
+
+### 🔀 Routing Policies & Remote Rule Sets
+Protocol sniffing, destination domain override, sing-box DNS resolution policy, routing rule chains, and `.srs` remote rule sets.
+
+<p align="center">
+  <img src="docs/images/routing.png" alt="Routing" width="100%" />
+</p>
+
+### 📥 Inbound Listeners
+TProxy transparent proxy listener (default `:12345`), TUN virtual device, and mixed HTTP/SOCKS5 inbound listeners.
+
+<p align="center">
+  <img src="docs/images/inbounds.png" alt="Inbounds" width="100%" />
+</p>
+
+### 🛡️ DNS Configuration
+Custom upstream DNS resolvers, encrypted DoH/DoT/UDP, detour routing, and router-safe zero-leak native OS fallback.
+
+<p align="center">
+  <img src="docs/images/dns.png" alt="DNS" width="100%" />
+</p>
+
 ---
 
 ## ✨ Features
