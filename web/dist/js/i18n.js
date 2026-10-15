@@ -124,6 +124,14 @@
       'outbound.no_groups': 'No policy groups configured',
       'outbound.details': 'Node Details',
       'outbound.refresh_sub': 'Update Subscription',
+      'outbound.up_mbps': 'Upload Bandwidth (up_mbps)',
+      'outbound.up_mbps_desc': 'Target upload rate in Mbps. Activates Hysteria 2 Brutal congestion control.',
+      'outbound.down_mbps': 'Download Bandwidth (down_mbps)',
+      'outbound.down_mbps_desc': 'Target download rate in Mbps. If empty, falls back to standard BBR.',
+      'outbound.obfs_type': 'Obfuscation Type (obfs)',
+      'outbound.obfs_password': 'Obfuscation Password (obfs-password)',
+      'outbound.hy2_bbr_hint': 'Bandwidth unconfigured: kernel uses standard BBR',
+      'outbound.hy2_brutal_active': 'Brutal CC Active',
 
       // Routing
       'routing.title': 'Routing Policy',
@@ -365,6 +373,14 @@
       'outbound.no_groups': '暂无策略分组',
       'outbound.details': '节点详情',
       'outbound.refresh_sub': '更新订阅',
+      'outbound.up_mbps': '上行带宽 (up_mbps)',
+      'outbound.up_mbps_desc': '目标上行速率 (Mbps)。设置后立即激活 Hysteria 2 Brutal 暴力流控算法。',
+      'outbound.down_mbps': '下行带宽 (down_mbps)',
+      'outbound.down_mbps_desc': '目标下行速率 (Mbps)。留空则由内核回退为普通 BBR 算法。',
+      'outbound.obfs_type': '混淆方式 (obfs)',
+      'outbound.obfs_password': '混淆密码 (obfs-password)',
+      'outbound.hy2_bbr_hint': '未配置带宽参数，内核将回退为普通 BBR 算法',
+      'outbound.hy2_brutal_active': '已启用 Brutal 流控',
 
       // Routing
       'routing.title': '分流配置',

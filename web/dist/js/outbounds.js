@@ -433,6 +433,16 @@
                   <span class="badge badge-neutral badge-sm">Sub: ${this.escapeHtml(node.subscription_tag)}</span>
                 </div>
               ` : ''}
+
+              ${(node.type === 'hysteria2' && (node.settings?.up_mbps || node.settings?.down_mbps)) ? `
+                <div class="node-sub-tag mt-1">
+                  <span class="badge badge-hy2 badge-sm">⚡ Brutal: ↑${node.settings?.up_mbps || 0}M / ↓${node.settings?.down_mbps || 0}M</span>
+                </div>
+              ` : (node.type === 'hysteria2' ? `
+                <div class="node-sub-tag mt-1">
+                  <span class="badge badge-neutral badge-sm" title="${I18n.t('outbound.hy2_bbr_hint')}">⚙️ BBR (未配置带宽)</span>
+                </div>
+              ` : '')}
             </div>
 
             <div class="node-card-footer mt-3">
@@ -829,6 +839,40 @@
               </div>
             </div>
           </div>
+
+          <!-- Hysteria 2 Specialized Brutal Bandwidth & Obfs Configuration -->
+          <div id="modal-hy2-section" class="mt-3 p-3 glass-panel" style="border-radius: var(--radius-md); border: 1px solid rgba(236, 72, 153, 0.25); background: rgba(236, 72, 153, 0.04); ${data.type === 'hysteria2' ? '' : 'display: none;'}">
+            <div class="d-flex align-items-center mb-2 gap-2" style="color: #f472b6; font-size: 13px; font-weight: 600;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              <span>Hysteria 2 Brutal 流控与混淆配置</span>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label">${I18n.t('outbound.up_mbps')}</label>
+                <input type="number" class="form-control font-mono" id="modal-node-up-mbps" value="${data.settings?.up_mbps || ''}" placeholder="例如: 50" min="1">
+                <small class="text-muted d-block mt-1">${I18n.t('outbound.up_mbps_desc')}</small>
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label">${I18n.t('outbound.down_mbps')}</label>
+                <input type="number" class="form-control font-mono" id="modal-node-down-mbps" value="${data.settings?.down_mbps || ''}" placeholder="例如: 300" min="1">
+                <small class="text-muted d-block mt-1">${I18n.t('outbound.down_mbps_desc')}</small>
+              </div>
+            </div>
+
+            <div class="form-row mt-2">
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label">${I18n.t('outbound.obfs_type')}</label>
+                <input type="text" class="form-control font-mono" id="modal-node-obfs-type" value="${this.escapeHtml(data.settings?.obfs?.type || '')}" placeholder="salamander (可选)">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label">${I18n.t('outbound.obfs_password')}</label>
+                <input type="text" class="form-control font-mono" id="modal-node-obfs-pass" value="${this.escapeHtml(data.settings?.obfs?.password || '')}" placeholder="混淆密码 (可选)">
+              </div>
+            </div>
+          </div>
         </div>
       `;
 
@@ -880,6 +924,36 @@
             }
           }
 
+          if (type === 'hysteria2') {
+            const upVal = parseInt(document.getElementById('modal-node-up-mbps')?.value, 10);
+            const downVal = parseInt(document.getElementById('modal-node-down-mbps')?.value, 10);
+            if (!isNaN(upVal) && upVal > 0) {
+              payload.settings.up_mbps = upVal;
+            } else {
+              delete payload.settings.up_mbps;
+            }
+            if (!isNaN(downVal) && downVal > 0) {
+              payload.settings.down_mbps = downVal;
+            } else {
+              delete payload.settings.down_mbps;
+            }
+
+            const obfsType = document.getElementById('modal-node-obfs-type')?.value.trim();
+            const obfsPass = document.getElementById('modal-node-obfs-pass')?.value.trim();
+            if (obfsType && obfsType !== 'none') {
+              payload.settings.obfs = {
+                type: obfsType,
+                password: obfsPass
+              };
+            } else {
+              delete payload.settings.obfs;
+            }
+          } else {
+            delete payload.settings.up_mbps;
+            delete payload.settings.down_mbps;
+            delete payload.settings.obfs;
+          }
+
           try {
             if (isEdit) {
               await API.put(`outbounds/${existing.id}`, payload);
@@ -895,6 +969,14 @@
           }
         }
       });
+
+      const typeSelect = document.getElementById('modal-node-type');
+      const hy2Section = document.getElementById('modal-hy2-section');
+      if (typeSelect && hy2Section) {
+        typeSelect.addEventListener('change', () => {
+          hy2Section.style.display = (typeSelect.value === 'hysteria2') ? '' : 'none';
+        });
+      }
     }
 
     /**
