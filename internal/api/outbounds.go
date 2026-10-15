@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -236,7 +237,10 @@ type SpeedTestResult struct {
 	Latency int    `json:"latency"` // ms, -1 if unreachable
 }
 
-// HandleSpeedTest performs a concurrent TCP latency test for specified outbounds.
+// HandleSpeedTest performs a concurrent latency test for specified outbounds.
+// It prioritizes sing-box's native Clash API (/proxies/{tag}/delay) for true proxy testing
+// (essential for UDP protocols like Hysteria 2 / TUIC as well as TCP protocols),
+// and gracefully falls back to direct TCP handshake if sing-box or Clash API is unavailable.
 func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req SpeedTestRequest
@@ -248,7 +252,11 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 		if timeoutSec <= 0 {
 			timeoutSec = 5
 		}
-		dialTimeout := time.Duration(timeoutSec) * time.Second
+
+		testURL := strings.TrimSpace(req.URL)
+		if testURL == "" {
+			testURL = "https://www.gstatic.com/generate_204"
+		}
 
 		allOutbounds := store.GetOutbounds()
 		targetMap := make(map[string]bool)
@@ -267,7 +275,7 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 
 		results := make([]SpeedTestResult, len(targets))
 		var wg sync.WaitGroup
-		sem := make(chan struct{}, 16) // Max 16 concurrent TCP handshakes
+		sem := make(chan struct{}, 16) // Max 16 concurrent tests
 
 		for i, out := range targets {
 			wg.Add(1)
@@ -276,15 +284,7 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-				addr := net.JoinHostPort(outbound.Server, strconv.Itoa(outbound.Port))
-				start := time.Now()
-				conn, err := net.DialTimeout("tcp", addr, dialTimeout)
-
-				latency := -1
-				if err == nil {
-					latency = int(time.Since(start).Milliseconds())
-					_ = conn.Close()
-				}
+				latency := testSingleOutbound(outbound, testURL, timeoutSec)
 
 				_ = store.UpdateOutboundLatency(outbound.ID, latency)
 				results[idx] = SpeedTestResult{
@@ -302,6 +302,94 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 			"results": results,
 		})
 	}
+}
+
+// testSingleOutbound tests an outbound node latency.
+// It first attempts the sing-box native Clash API endpoint, then falls back to TCP dial if applicable.
+func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int) int {
+	timeoutMs := timeoutSec * 1000
+	if timeoutMs <= 0 {
+		timeoutMs = 5000
+	}
+
+	// 1. Prioritize sing-box Clash API (/proxies/:tag/delay) for true end-to-end proxy delay
+	if outbound.Tag != "" {
+		if l, err := queryClashAPIDelay(outbound.Tag, testURL, timeoutMs); err == nil && l > 0 {
+			return l
+		}
+
+		// If primary URL timed out or failed, try secondary Cloudflare 204 endpoint as backup
+		if testURL == "https://www.gstatic.com/generate_204" || testURL == "http://www.gstatic.com/generate_204" {
+			if l, err := queryClashAPIDelay(outbound.Tag, "http://cp.cloudflare.com/generate_204", timeoutMs); err == nil && l > 0 {
+				return l
+			}
+		}
+	}
+
+	// 2. Fallback: Direct TCP handshake (only applicable to TCP-based protocols, never UDP-only like Hysteria2 or TUIC)
+	outType := strings.ToLower(outbound.Type)
+	if outType != "hysteria2" && outType != "hy2" && outType != "tuic" {
+		if outbound.Server != "" && outbound.Port > 0 {
+			addr := net.JoinHostPort(outbound.Server, strconv.Itoa(outbound.Port))
+			start := time.Now()
+			conn, err := net.DialTimeout("tcp", addr, time.Duration(timeoutSec)*time.Second)
+			if err == nil {
+				_ = conn.Close()
+				return int(time.Since(start).Milliseconds())
+			}
+		}
+	}
+
+	return -1
+}
+
+var clashAPIEndpoint = "127.0.0.1:9091"
+
+// queryClashAPIDelay queries sing-box's external controller Clash API for proxy delay measurement.
+func queryClashAPIDelay(tag string, testURL string, timeoutMs int) (int, error) {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return -1, fmt.Errorf("empty tag")
+	}
+
+	endpoint := clashAPIEndpoint
+	if endpoint == "" {
+		endpoint = "127.0.0.1:9091"
+	}
+
+	apiURL := fmt.Sprintf("http://%s/proxies/%s/delay?url=%s&timeout=%d",
+		endpoint,
+		url.PathEscape(tag),
+		url.QueryEscape(testURL),
+		timeoutMs,
+	)
+
+	client := &http.Client{
+		Timeout: time.Duration(timeoutMs+1500) * time.Millisecond,
+	}
+
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		return -1, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return -1, fmt.Errorf("clash api status %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Delay int `json:"delay"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return -1, err
+	}
+
+	if data.Delay <= 0 {
+		return -1, fmt.Errorf("invalid delay: %d", data.Delay)
+	}
+
+	return data.Delay, nil
 }
 
 // ==================== GROUPS ====================

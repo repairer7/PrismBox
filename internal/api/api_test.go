@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -558,5 +559,85 @@ func TestConfigExportValidateImportRaw(t *testing.T) {
 	}
 	if len(importedStoreCfg.Groups) == 0 || importedStoreCfg.Groups[0].Tag != "proxy-select" {
 		t.Errorf("imported groups mismatch: %+v", importedStoreCfg.Groups)
+	}
+}
+
+func TestSpeedTestWithMockClashAPI(t *testing.T) {
+	// Set up mock Clash API server that responds to /proxies/{tag}/delay
+	mockClash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/proxies/") && strings.HasSuffix(r.URL.Path, "/delay") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"delay": 68}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer mockClash.Close()
+
+	// Redirect clashAPIEndpoint to mock server
+	oldEndpoint := clashAPIEndpoint
+	clashAPIEndpoint = mockClash.Listener.Addr().String()
+	defer func() { clashAPIEndpoint = oldEndpoint }()
+
+	tmpDir := t.TempDir()
+	store, err := config.NewStore(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to init store: %v", err)
+	}
+
+	hy2Out := config.Outbound{
+		ID:      "hy2-test-node",
+		Tag:     "Singapore-HY2",
+		Type:    "hysteria2",
+		Server:  "198.51.100.1",
+		Port:    50551,
+		Enabled: true,
+	}
+	createdOut, err := store.AddOutbound(hy2Out)
+	if err != nil {
+		t.Fatalf("failed to add outbound: %v", err)
+	}
+
+	reqBody := `{"ids":["` + createdOut.ID + `"],"timeout":2}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/outbounds/speedtest", bytes.NewBufferString(reqBody))
+	rr := httptest.NewRecorder()
+	HandleSpeedTest(store)(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Success bool              `json:"success"`
+		Results []SpeedTestResult `json:"results"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if len(resp.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(resp.Results))
+	}
+
+	if resp.Results[0].Latency != 68 {
+		t.Errorf("expected latency 68ms via Clash API, got %d", resp.Results[0].Latency)
+	}
+
+	// Verify latency was updated in store
+	var foundOut config.Outbound
+	var found bool
+	for _, o := range store.GetOutbounds() {
+		if o.ID == createdOut.ID {
+			foundOut = o
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("outbound not found in store")
+	}
+	if foundOut.Latency != 68 {
+		t.Errorf("expected stored latency 68, got %d", foundOut.Latency)
 	}
 }

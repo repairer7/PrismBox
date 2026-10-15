@@ -44,14 +44,21 @@ type SingBoxRoute struct {
 	AutoDetectInterface   bool                     `json:"auto_detect_interface"`
 }
 
-// SingBoxExperimental defines experimental configurations such as Clash API.
+// SingBoxExperimental defines experimental configurations such as Clash API and Cache File.
 type SingBoxExperimental struct {
-	ClashAPI *SingBoxClashAPI `json:"clash_api,omitempty"`
+	ClashAPI  *SingBoxClashAPI  `json:"clash_api,omitempty"`
+	CacheFile *SingBoxCacheFile `json:"cache_file,omitempty"`
 }
 
 // SingBoxClashAPI defines external controller settings for Clash API.
 type SingBoxClashAPI struct {
 	ExternalController string `json:"external_controller"`
+}
+
+// SingBoxCacheFile defines persistent caching for Clash API latency history and selection states.
+type SingBoxCacheFile struct {
+	Enabled       bool `json:"enabled"`
+	StoreSelected bool `json:"store_selected,omitempty"`
 }
 
 // GenerateSingBoxConfig converts PrismBoxConfig stored in store into native sing-box 1.14.3 JSON.
@@ -77,6 +84,10 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		Experimental: &SingBoxExperimental{
 			ClashAPI: &SingBoxClashAPI{
 				ExternalController: "127.0.0.1:9091",
+			},
+			CacheFile: &SingBoxCacheFile{
+				Enabled:       true,
+				StoreSelected: true,
 			},
 		},
 	}
