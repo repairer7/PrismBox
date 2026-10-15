@@ -115,10 +115,7 @@ func main() {
 }
 
 func printBanner(listenAddr, dataDir, kernelPath string) {
-	ver := Version
-	if !strings.HasPrefix(ver, "v") {
-		ver = "v" + ver
-	}
+	ver := "v" + strings.TrimLeft(Version, "v")
 	banner := `
    ____       _               ____             
   |  _ \ _ __(_)___ _ __ ___ | __ )  _____  __ 

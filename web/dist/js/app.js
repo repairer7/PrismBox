@@ -487,6 +487,13 @@
         }
       });
 
+      WS.onKernelStatus((info) => {
+        if (info && info.status) {
+          this.kernelStatus = info.status;
+          this.updateKernelStatusBadge(info.status);
+        }
+      });
+
       WS.connect();
     }
 

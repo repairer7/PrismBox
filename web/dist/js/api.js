@@ -176,13 +176,14 @@
     messageListeners: new Set(),
     statsListeners: new Set(),
     stateListeners: new Set(),
+    logListeners: new Set(),
+    statusListeners: new Set(),
     reconnectTimer: null,
     pingTimer: null,
     retryCount: 0,
     maxRetryDelay: 10000,
     baseRetryDelay: 1000,
     isManualClose: false,
-    mockTimer: null,
 
     /**
      * Connect to WebSocket endpoint
@@ -205,7 +206,6 @@
         this.socket.onopen = () => {
           this.retryCount = 0;
           this.notifyState('connected');
-          this.stopMockTelemetry();
           this.startHeartbeat();
         };
 
@@ -215,22 +215,42 @@
             if (!event.data || event.data === 'pong') return;
             const payload = JSON.parse(event.data);
 
-            // Standardize telemetry fields
-            const normalized = {
-              cpu: typeof payload.cpu_percent === 'number' ? payload.cpu_percent : (payload.cpu || 0),
-              memoryUsed: typeof payload.mem_used_mb === 'number' ? payload.mem_used_mb * 1024 * 1024 : (payload.memory?.used || 0),
-              memoryTotal: typeof payload.mem_total_mb === 'number' ? payload.mem_total_mb * 1024 * 1024 : (payload.memory?.total || 1024 * 1024 * 1024),
-              uploadSpeed: typeof payload.upload_speed === 'number' ? payload.upload_speed : (payload.speed?.upload || 0),
-              downloadSpeed: typeof payload.download_speed === 'number' ? payload.download_speed : (payload.speed?.download || 0),
-              totalUpload: typeof payload.total_upload === 'number' ? payload.total_upload : (payload.traffic?.upload || 0),
-              totalDownload: typeof payload.total_download === 'number' ? payload.total_download : (payload.traffic?.download || 0),
-              uptime: payload.uptime || 0,
-              kernelStatus: payload.kernel_status || (payload.kernel?.status || 'stopped'),
-              raw: payload
-            };
-
             this.dispatchMessage(payload);
-            this.dispatchStats(normalized);
+
+            const msgType = payload.type || 'stats';
+
+            if (msgType === 'stats') {
+              const normalized = {
+                cpu: typeof payload.cpu_percent === 'number' ? payload.cpu_percent : (payload.cpu || 0),
+                memoryUsed: typeof payload.mem_used_mb === 'number' ? payload.mem_used_mb * 1024 * 1024 : (payload.memory?.used || 0),
+                memoryTotal: typeof payload.mem_total_mb === 'number' ? payload.mem_total_mb * 1024 * 1024 : (payload.memory?.total || 1024 * 1024 * 1024),
+                uploadSpeed: typeof payload.upload_speed === 'number' ? payload.upload_speed : (payload.speed?.upload || 0),
+                downloadSpeed: typeof payload.download_speed === 'number' ? payload.download_speed : (payload.speed?.download || 0),
+                totalUpload: typeof payload.total_upload === 'number' ? payload.total_upload : (payload.traffic?.upload || 0),
+                totalDownload: typeof payload.total_download === 'number' ? payload.total_download : (payload.traffic?.download || 0),
+                uptime: payload.uptime || 0,
+                kernelStatus: payload.kernel_status || payload.kernel?.status || 'running',
+                kernelPid: payload.kernel?.pid,
+                kernelVersion: payload.kernel?.version,
+                raw: payload
+              };
+              this.dispatchStats(normalized);
+            } else if (msgType === 'kernel_status') {
+              const status = payload.status || payload.kernel?.status;
+              if (status) {
+                this.dispatchKernelStatus({
+                  status: status,
+                  pid: payload.kernel?.pid,
+                  version: payload.kernel?.version,
+                  uptime: payload.kernel?.uptime
+                });
+              }
+            } else if (msgType === 'log') {
+              const logLine = payload.message || payload.log || '';
+              if (logLine) {
+                this.dispatchLog(logLine);
+              }
+            }
           } catch (err) {
             console.warn('[WS] Failed to parse message:', event.data);
           }
@@ -245,15 +265,15 @@
           this.notifyState('disconnected');
           if (!this.isManualClose) {
             this.scheduleReconnect();
-            this.startMockTelemetry();
           }
         };
       } catch (err) {
         console.warn('[WS] Connection exception:', err);
         this.stopHeartbeat();
         this.notifyState('disconnected');
-        this.scheduleReconnect();
-        this.startMockTelemetry();
+        if (!this.isManualClose) {
+          this.scheduleReconnect();
+        }
       }
     },
 
@@ -267,7 +287,6 @@
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
       }
-      this.stopMockTelemetry();
       if (this.socket) {
         this.socket.close();
         this.socket = null;
@@ -333,6 +352,26 @@
     },
 
     /**
+     * Subscribe to realtime kernel status updates
+     */
+    onKernelStatus(callback) {
+      if (typeof callback === 'function') {
+        this.statusListeners.add(callback);
+      }
+      return () => this.statusListeners.delete(callback);
+    },
+
+    /**
+     * Subscribe to realtime kernel log lines
+     */
+    onLog(callback) {
+      if (typeof callback === 'function') {
+        this.logListeners.add(callback);
+      }
+      return () => this.logListeners.delete(callback);
+    },
+
+    /**
      * Subscribe to connection state changes ('connected' | 'connecting' | 'disconnected')
      */
     onStateChange(callback) {
@@ -360,45 +399,16 @@
       });
     },
 
-    /**
-     * Fallback simulated telemetry when backend server is offline
-     */
-    startMockTelemetry() {
-      if (this.mockTimer) return;
-      let mockUptime = 3600;
-      let mockUploadSpeed = 125000;
-      let mockDownloadSpeed = 1680000;
-      let mockTotalUp = 450000000;
-      let mockTotalDown = 2800000000;
-
-      this.mockTimer = setInterval(() => {
-        mockUptime++;
-        mockUploadSpeed = Math.max(1024, Math.floor(mockUploadSpeed + (Math.random() - 0.49) * 80000));
-        mockDownloadSpeed = Math.max(5120, Math.floor(mockDownloadSpeed + (Math.random() - 0.48) * 450000));
-        mockTotalUp += mockUploadSpeed;
-        mockTotalDown += mockDownloadSpeed;
-
-        const mockStats = {
-          cpu: +(1.2 + Math.random() * 3.5).toFixed(1),
-          memoryUsed: (42 + Math.random() * 6) * 1024 * 1024,
-          memoryTotal: 1024 * 1024 * 1024,
-          uploadSpeed: mockUploadSpeed,
-          downloadSpeed: mockDownloadSpeed,
-          totalUpload: mockTotalUp,
-          totalDownload: mockTotalDown,
-          uptime: mockUptime,
-          kernelStatus: 'running'
-        };
-
-        this.dispatchStats(mockStats);
-      }, 1000);
+    dispatchKernelStatus(info) {
+      this.statusListeners.forEach((fn) => {
+        try { fn(info); } catch (e) { console.error(e); }
+      });
     },
 
-    stopMockTelemetry() {
-      if (this.mockTimer) {
-        clearInterval(this.mockTimer);
-        this.mockTimer = null;
-      }
+    dispatchLog(line) {
+      this.logListeners.forEach((fn) => {
+        try { fn(line); } catch (e) { console.error(e); }
+      });
     }
   };
 

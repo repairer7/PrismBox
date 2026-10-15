@@ -179,7 +179,7 @@
                   </span>
                 </div>
                 <div class="kernel-specs">
-                  <span>${I18n.t('dashboard.version')}: <strong>v1.14.3</strong></span>
+                  <span>${I18n.t('dashboard.version')}: <strong id="dash-version">${this.lastStats.kernelVersion || 'v1.14.3'}</strong></span>
                   <span>${I18n.t('dashboard.uptime')}: <strong id="dash-uptime">${window.formatUptime(this.lastStats.uptime)}</strong></span>
                 </div>
               </div>
@@ -418,6 +418,12 @@
       if (this.wsUnsubscribe) {
         this.wsUnsubscribe();
       }
+      if (this.statusUnsubscribe) {
+        this.statusUnsubscribe();
+      }
+      if (this.logUnsubscribe) {
+        this.logUnsubscribe();
+      }
 
       this.wsUnsubscribe = WS.onStats((stats) => {
         if (this.isDestroyed) return;
@@ -446,6 +452,25 @@
         this.updateStatsDOM();
         this.drawChart();
       });
+
+      this.statusUnsubscribe = WS.onKernelStatus((info) => {
+        if (this.isDestroyed || !info) return;
+        if (info.status) {
+          this.lastStats.kernelStatus = info.status;
+          if (info.pid) this.lastStats.kernelPid = info.pid;
+          if (info.version) this.lastStats.kernelVersion = info.version;
+          this.updateStatsDOM();
+        }
+      });
+
+      this.logUnsubscribe = WS.onLog((line) => {
+        if (this.isDestroyed || !line) return;
+        this.logs.push(line);
+        if (this.logs.length > 50) {
+          this.logs.shift();
+        }
+        this.renderLogs();
+      });
     }
 
     /**
@@ -462,6 +487,7 @@
       const elTotalDown = document.getElementById('stat-total-down');
       const elUptime = document.getElementById('dash-uptime');
       const elKernelBadge = document.getElementById('dash-kernel-badge');
+      const elVersion = document.getElementById('dash-version');
 
       if (elCpu) elCpu.textContent = `${this.lastStats.cpu.toFixed(1)}%`;
       if (elMem) elMem.textContent = window.formatBytes(this.lastStats.memoryUsed);
@@ -472,10 +498,11 @@
       if (elTotalUp) elTotalUp.textContent = window.formatBytes(this.lastStats.totalUpload);
       if (elTotalDown) elTotalDown.textContent = window.formatBytes(this.lastStats.totalDownload);
       if (elUptime) elUptime.textContent = window.formatUptime(this.lastStats.uptime);
+      if (elVersion && this.lastStats.kernelVersion) elVersion.textContent = this.lastStats.kernelVersion;
 
       if (elKernelBadge) {
         const status = this.lastStats.kernelStatus || 'stopped';
-        elKernelBadge.className = `badge ${status === 'running' ? 'badge-success' : 'badge-danger'}`;
+        elKernelBadge.className = `badge ${status === 'running' ? 'badge-success' : (status === 'error' ? 'badge-warning' : 'badge-danger')}`;
         elKernelBadge.textContent = I18n.t('kernel.' + status) || status;
       }
     }
@@ -548,6 +575,14 @@
       if (this.wsUnsubscribe) {
         this.wsUnsubscribe();
         this.wsUnsubscribe = null;
+      }
+      if (this.statusUnsubscribe) {
+        this.statusUnsubscribe();
+        this.statusUnsubscribe = null;
+      }
+      if (this.logUnsubscribe) {
+        this.logUnsubscribe();
+        this.logUnsubscribe = null;
       }
       window.removeEventListener('resize', this.handleResize.bind(this));
     }
