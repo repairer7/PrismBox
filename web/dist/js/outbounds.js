@@ -248,6 +248,7 @@
         const typeBadge = isSelector ? 'badge-primary' : 'badge-warning';
         const typeLabel = isSelector ? I18n.t('outbound.group_selector') : I18n.t('outbound.group_urltest');
         const includedTags = grp.outbounds || [];
+        const currentActive = grp.selected || includedTags[0] || '';
 
         return `
           <div class="glass-panel group-card" data-id="${grp.id}">
@@ -274,16 +275,24 @@
 
             <div class="group-card-body mt-2">
               <div class="active-node-selector">
-                <label class="form-label text-xs">${I18n.t('outbound.active_node')}:</label>
-                <select class="form-select form-select-sm group-active-select" data-id="${grp.id}">
-                  ${includedTags.map(tag => `<option value="${this.escapeHtml(tag)}">${this.escapeHtml(tag)}</option>`).join('')}
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label text-xs mb-0">${isSelector ? I18n.t('outbound.active_node') : '当前生效优选节点'}:</label>
+                  ${!isSelector ? '<span class="badge badge-success badge-sm" style="font-size: 11px;">⚡ 自动优选 (Auto)</span>' : ''}
+                </div>
+                <select class="form-select form-select-sm group-active-select" data-id="${grp.id}" ${!isSelector ? 'disabled' : ''}>
+                  ${includedTags.map(tag => {
+                    const isSel = (currentActive === tag);
+                    const nodeObj = this.nodes.find(n => n.tag === tag);
+                    const latStr = nodeObj && nodeObj.latency > 0 ? ` (${nodeObj.latency}ms)` : '';
+                    return `<option value="${this.escapeHtml(tag)}" ${isSel ? 'selected' : ''}>${this.escapeHtml(tag)}${latStr}</option>`;
+                  }).join('')}
                 </select>
               </div>
 
               ${!isSelector ? `
                 <div class="group-meta mt-2 text-xs text-muted">
-                  <span>URL: <code>${this.escapeHtml(grp.url || 'http://cp.cloudflare.com/generate_204')}</code></span>
-                  <span>Interval: <code>${this.escapeHtml(grp.interval || '3m')}</code></span>
+                  <span>测速地址: <code>${this.escapeHtml(grp.url || 'http://cp.cloudflare.com/generate_204')}</code></span>
+                  <span class="ml-2">调度策略: <code>最低延迟优先</code></span>
                 </div>
               ` : ''}
             </div>
@@ -292,6 +301,20 @@
       }).join('');
 
       // Bind group card events
+      container.querySelectorAll('.group-active-select').forEach(sel => {
+        sel.addEventListener('change', async (e) => {
+          const groupId = e.target.dataset.id;
+          const selectedTag = e.target.value;
+          try {
+            await API.put(`groups/${groupId}/select`, { selected: selectedTag });
+            window.showToast(I18n.t('common.success'), 'success', 1500);
+            await this.loadAll();
+          } catch (err) {
+            window.showToast(I18n.t('common.error') + ': ' + err.message, 'error');
+          }
+        });
+      });
+
       container.querySelectorAll('.btn-edit-group').forEach(btn => {
         btn.addEventListener('click', () => {
           const grp = this.groups.find(g => g.id === btn.dataset.id);
@@ -351,7 +374,9 @@
         };
 
         let latencyBadge = '';
-        if (typeof node.latency === 'number' && node.latency > 0) {
+        if (node.type === 'block') {
+          latencyBadge = `<span class="badge badge-neutral latency-badge">N/A (Block)</span>`;
+        } else if (typeof node.latency === 'number' && node.latency > 0) {
           const latencyClass = node.latency < 100 ? 'badge-success' : (node.latency < 250 ? 'badge-warning' : 'badge-danger');
           latencyBadge = `<span class="badge ${latencyClass} latency-badge">${node.latency} ms</span>`;
         } else if (node.latency === -1) {
@@ -374,15 +399,33 @@
 
             <div class="node-card-body mt-2">
               <div class="node-endpoint">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-                  <line x1="6" y1="6" x2="6.01" y2="6"/>
-                  <line x1="6" y1="18" x2="6.01" y2="18"/>
-                </svg>
-                <span class="endpoint-addr">
-                  ${node.server ? `${this.escapeHtml(node.server)}:${node.server_port || ''}` : '<span class="text-muted">Direct / Built-in</span>'}
-                </span>
+                ${node.type === 'direct' ? `
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--emerald, #10b981)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  <span class="endpoint-addr" style="color: var(--emerald-light, #34d399);">
+                    <strong>直连网络 / 本地物理出站 (Direct)</strong>
+                  </span>
+                ` : (node.type === 'block' ? `
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--rose, #f43f5e)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                  </svg>
+                  <span class="endpoint-addr" style="color: var(--rose-light, #fb7185);">
+                    <strong>流量阻断 / 拦截丢弃 (Drop & Reject)</strong>
+                  </span>
+                ` : `
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                    <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                    <line x1="6" y1="6" x2="6.01" y2="6"/>
+                    <line x1="6" y1="18" x2="6.01" y2="18"/>
+                  </svg>
+                  <span class="endpoint-addr">
+                    ${node.server ? `${this.escapeHtml(node.server)}:${node.server_port || ''}` : '<span class="text-muted">Built-in Outbound</span>'}
+                  </span>
+                `)}
               </div>
 
               ${node.subscription_tag ? `
@@ -394,26 +437,38 @@
 
             <div class="node-card-footer mt-3">
               <div class="footer-left">
-                <button class="btn-icon btn-sm btn-test-single" data-id="${node.id}" title="${I18n.t('outbound.speedtest')}">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                  </svg>
-                </button>
+                ${node.type !== 'block' ? `
+                  <button class="btn-icon btn-sm btn-test-single" data-id="${node.id}" title="${I18n.t('outbound.speedtest')}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                  </button>
+                ` : `
+                  <span class="badge badge-neutral badge-sm" style="font-size: 11px;">静默阻断</span>
+                `}
               </div>
 
               <div class="footer-right">
-                <button class="btn-icon btn-sm btn-edit-node" data-id="${node.id}" title="${I18n.t('common.edit')}">
+                <button class="btn-icon btn-sm btn-edit-node" data-id="${node.id}" title="${node.type === 'direct' || node.type === 'block' ? '查看内置出站说明' : I18n.t('common.edit')}">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    ${node.type === 'direct' || node.type === 'block' ? `
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" x2="12" y2="12"></line>
+                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    ` : `
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    `}
                   </svg>
                 </button>
-                <button class="btn-icon btn-sm btn-delete-node text-danger" data-id="${node.id}" title="${I18n.t('common.delete')}">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                  </svg>
-                </button>
+                ${(node.type !== 'direct' && node.type !== 'block') ? `
+                  <button class="btn-icon btn-sm btn-delete-node text-danger" data-id="${node.id}" title="${I18n.t('common.delete')}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                  </button>
+                ` : ''}
               </div>
             </div>
           </div>
@@ -467,7 +522,7 @@
               node.latency = item.latency;
             }
           }
-          this.renderNodes();
+          await this.loadAll();
           window.showToast(I18n.t('common.success'), 'success', 2000);
         }
       } catch (err) {
@@ -683,6 +738,38 @@
      * Add or Edit Node Modal
      */
     openNodeModal(existing = null) {
+      if (existing && (existing.type === 'direct' || existing.type === 'block')) {
+        const isBlock = existing.type === 'block';
+        window.showModal({
+          title: isBlock ? '阻断出站节点 (Block Outbound)' : '直连出站节点 (Direct Outbound)',
+          bodyHtml: `
+            <div class="system-node-info p-3">
+              <div class="d-flex align-items-center mb-3">
+                <span class="badge ${isBlock ? 'badge-danger' : 'badge-success'} mr-2" style="font-size: 14px; padding: 6px 12px;">
+                  ${isBlock ? 'BLOCK' : 'DIRECT'}
+                </span>
+                <h4 style="margin: 0;">${this.escapeHtml(existing.tag)}</h4>
+              </div>
+              <p style="line-height: 1.6; color: var(--text-secondary, #94a3b8);">
+                ${isBlock 
+                  ? '这是 sing-box 系统核心内置的<strong>流量阻断出站节点</strong>。<br>当在“分流配置”中将规则动作目标指定为 <code>block</code> 时，所有匹配到的网络连接都会被 sing-box 核心直接静默拦截并丢弃（例如广告拦截、隐私防护、恶意追踪等）。<br><br>该节点属于系统级内置规则动作终点，<strong>无需且不支持配置外部服务器与端口</strong>。'
+                  : '这是 sing-box 系统核心内置的<strong>直连出站节点</strong>。<br>当分流规则动作目标为 <code>direct</code> 时，网络流量将绕过代理，直接通过本机物理网卡连接互联网。<br><br>您可以在节点卡片上点击<strong>测速按钮</strong>，检测本机直接访问互联网的物理网络延迟。该节点无需配置外部代理服务器。'
+                }
+              </p>
+              <div class="form-group mt-3">
+                <label class="form-label">${I18n.t('common.tag')} (系统出站标识)</label>
+                <input type="text" class="form-control" value="${this.escapeHtml(existing.tag)}" readonly disabled>
+                <small class="text-muted">系统核心内置节点标识固定，不支持重命名或删除。</small>
+              </div>
+            </div>
+          `,
+          saveText: I18n.t('common.confirm'),
+          cancelText: I18n.t('common.cancel'),
+          onSave: async () => true
+        });
+        return;
+      }
+
       const isEdit = !!existing;
       const data = existing || {
         tag: 'node-1',
@@ -937,6 +1024,11 @@
      * Delete node
      */
     deleteNode(node) {
+      if (node.type === 'direct' || node.type === 'block') {
+        window.showToast('系统核心内置出站节点不支持删除', 'warning');
+        return;
+      }
+
       window.showModal({
         title: I18n.t('common.delete'),
         bodyHtml: `<p>${this.escapeHtml(I18n.t('outbound.delete_node_confirm', { tag: node.tag }))}</p>`,

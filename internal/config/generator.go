@@ -290,20 +290,14 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		}
 
 		if grp.Type == "urltest" {
-			url := grp.URL
-			if url == "" || strings.HasPrefix(url, "https://www.gstatic.com") {
-				url = "http://cp.cloudflare.com/generate_204"
-			}
-			grpMap["url"] = url
-
-			interval := grp.Interval
-			if interval == "" {
-				interval = "3m"
-			}
-			grpMap["interval"] = interval
-
-			if grp.Tolerance > 0 {
-				grpMap["tolerance"] = grp.Tolerance
+			// In PrismBox, urltest is managed by PrismBox control plane using native probing
+			// and dynamic selection. Generating as selector prevents sing-box from running
+			// noisy periodic background HTTP tests to external URLs.
+			grpMap["type"] = "selector"
+			if grp.Selected != "" {
+				grpMap["default"] = grp.Selected
+			} else if len(grp.Outbounds) > 0 {
+				grpMap["default"] = grp.Outbounds[0]
 			}
 		}
 

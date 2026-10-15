@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,6 +93,14 @@ func HandleDeleteOutbound(store *config.Store) http.HandlerFunc {
 		if id == "" {
 			writeError(w, http.StatusBadRequest, "outbound id is required")
 			return
+		}
+
+		// Prevent deletion of system built-in outbounds (direct, block)
+		for _, o := range store.GetOutbounds() {
+			if o.ID == id && (o.Tag == "direct" || o.Tag == "block" || o.Type == "direct" || o.Type == "block") {
+				writeError(w, http.StatusBadRequest, "cannot delete system built-in outbound: "+o.Tag)
+				return
+			}
 		}
 
 		if err := store.DeleteOutbound(id); err != nil {
@@ -269,7 +278,7 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 		var targets []config.Outbound
 		for _, out := range allOutbounds {
 			if len(req.IDs) == 0 || targetMap[out.ID] {
-				if out.Server != "" && out.Port > 0 {
+				if (out.Server != "" && out.Port > 0) || strings.EqualFold(out.Type, "direct") {
 					targets = append(targets, out)
 				}
 			}
@@ -299,6 +308,9 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 
 		wg.Wait()
 
+		// Re-evaluate URLTest groups based on new latencies
+		reevaluateURLTestGroups(store)
+
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"success": true,
 			"results": results,
@@ -307,50 +319,53 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 }
 
 // testSingleOutbound tests an outbound node latency.
-// It first attempts the sing-box native Clash API endpoint across reliable HTTP/HTTPS 204 test endpoints,
-// and gracefully falls back to a fast QUIC probe (for Hysteria 2 / TUIC) or direct TCP handshake.
+// It uses fast native network probing:
+// - Direct outbound: sends an HTTP GET directly to the test URL (real internet connection latency)
+// - QUIC protocols (Hysteria 2 / TUIC): sends an RFC 9000 QUIC probe for immediate UDP RTT
+// - TCP protocols (VLESS, VMess, Trojan, Shadowsocks, etc.): establishes a TCP handshake to server:port
 func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int) int {
 	if timeoutSec <= 0 {
 		timeoutSec = 10
 	}
-	timeoutMs := timeoutSec * 1000
 
 	if testURL == "" {
 		testURL = "http://cp.cloudflare.com/generate_204"
 	}
 
-	endpoints := []string{testURL}
-	fallbackCandidates := []string{
-		"http://cp.cloudflare.com/generate_204",
-		"https://cp.cloudflare.com/generate_204",
-		"http://www.gstatic.com/generate_204",
-		"https://www.gstatic.com/generate_204",
-		"http://connectivitycheck.gstatic.com/generate_204",
-	}
-	for _, cand := range fallbackCandidates {
-		found := false
-		for _, ep := range endpoints {
-			if ep == cand {
-				found = true
-				break
+	outType := strings.ToLower(strings.TrimSpace(outbound.Type))
+
+	// 1. Direct Outbound: test local internet connection latency via direct HTTP request
+	if outType == "direct" {
+		candidates := []string{
+			testURL,
+			"http://cp.cloudflare.com/generate_204",
+			"https://cp.cloudflare.com/generate_204",
+			"http://connectivitycheck.gstatic.com/generate_204",
+			"http://www.qualcomm.cn/generate_204",
+		}
+		client := &http.Client{
+			Timeout: time.Duration(timeoutSec) * time.Second,
+		}
+		for _, ep := range candidates {
+			if ep == "" {
+				continue
+			}
+			start := time.Now()
+			resp, err := client.Get(ep)
+			if err == nil {
+				_ = resp.Body.Close()
+				return int(time.Since(start).Milliseconds())
 			}
 		}
-		if !found {
-			endpoints = append(endpoints, cand)
-		}
+		return -1
 	}
 
-	// 1. Prioritize sing-box Clash API (/proxies/:tag/delay) for true end-to-end proxy delay
-	if outbound.Tag != "" {
-		for _, ep := range endpoints {
-			if l, err := queryClashAPIDelay(outbound.Tag, ep, timeoutMs); err == nil && l > 0 {
-				return l
-			}
-		}
+	// 2. Block Outbound: intentionally non-routable
+	if outType == "block" {
+		return -1
 	}
 
-	// 2. Fallback:
-	outType := strings.ToLower(outbound.Type)
+	// 3. Native Latency Probe for proxy nodes:
 	if outbound.Server != "" && outbound.Port > 0 {
 		// For QUIC UDP-based protocols (Hysteria 2, TUIC), perform a fast RFC 9000 QUIC probe
 		if outType == "hysteria2" || outType == "hy2" || outType == "tuic" {
@@ -359,7 +374,7 @@ func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int
 			}
 		}
 
-		// Direct TCP handshake fallback for all protocols that support TCP
+		// Direct TCP handshake for TCP-based proxy protocols
 		addr := net.JoinHostPort(outbound.Server, strconv.Itoa(outbound.Port))
 		start := time.Now()
 		conn, err := net.DialTimeout("tcp", addr, time.Duration(timeoutSec)*time.Second)
@@ -623,11 +638,13 @@ func HandleSelectGroupOutbound(store *config.Store) http.HandlerFunc {
 						}
 					}
 					groups[i].Outbounds = outbounds
-					if err := store.SetGroups(groups); err != nil {
-						writeError(w, http.StatusInternalServerError, "failed to update group selection: "+err.Error())
-						return
-					}
 				}
+				groups[i].Selected = req.Selected
+				if err := store.SetGroups(groups); err != nil {
+					writeError(w, http.StatusInternalServerError, "failed to update group selection: "+err.Error())
+					return
+				}
+				notifyClashAPISelectProxy(grp.Tag, req.Selected)
 				break
 			}
 		}
@@ -643,3 +660,80 @@ func HandleSelectGroupOutbound(store *config.Store) http.HandlerFunc {
 		})
 	}
 }
+
+// notifyClashAPISelectProxy dynamically switches the active outbound of a group in sing-box via Clash API.
+func notifyClashAPISelectProxy(groupTag, selectedTag string) {
+	groupTag = strings.TrimSpace(groupTag)
+	selectedTag = strings.TrimSpace(selectedTag)
+	if groupTag == "" || selectedTag == "" {
+		return
+	}
+	endpoint := clashAPIEndpoint
+	if endpoint == "" {
+		endpoint = "127.0.0.1:9091"
+	}
+	apiURL := fmt.Sprintf("http://%s/proxies/%s", endpoint, url.PathEscape(groupTag))
+	body, _ := json.Marshal(map[string]string{"name": selectedTag})
+	req, err := http.NewRequest(http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	resp, err := client.Do(req)
+	if err == nil {
+		_ = resp.Body.Close()
+	}
+}
+
+// reevaluateURLTestGroups re-evaluates all urltest groups, selecting the lowest latency outbound.
+func reevaluateURLTestGroups(store *config.Store) {
+	if store == nil {
+		return
+	}
+	allOutbounds := store.GetOutbounds()
+	latencyMap := make(map[string]int)
+	for _, o := range allOutbounds {
+		if o.Enabled {
+			latencyMap[o.Tag] = o.Latency
+		}
+	}
+
+	groups := store.GetGroups()
+	modified := false
+
+	for i, grp := range groups {
+		if strings.EqualFold(grp.Type, "urltest") && len(grp.Outbounds) > 0 {
+			bestTag := ""
+			bestLatency := 9999999
+
+			for _, tag := range grp.Outbounds {
+				lat, exists := latencyMap[tag]
+				if exists && lat > 0 && lat < bestLatency {
+					bestLatency = lat
+					bestTag = tag
+				}
+			}
+
+			if bestTag != "" {
+				newOutbounds := make([]string, 0, len(grp.Outbounds))
+				newOutbounds = append(newOutbounds, bestTag)
+				for _, tag := range grp.Outbounds {
+					if tag != bestTag {
+						newOutbounds = append(newOutbounds, tag)
+					}
+				}
+				groups[i].Outbounds = newOutbounds
+				groups[i].Selected = bestTag
+				modified = true
+
+				notifyClashAPISelectProxy(grp.Tag, bestTag)
+			}
+		}
+	}
+
+	if modified {
+		_ = store.SetGroups(groups)
+	}
+}
+

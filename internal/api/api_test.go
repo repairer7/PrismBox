@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -562,23 +561,12 @@ func TestConfigExportValidateImportRaw(t *testing.T) {
 	}
 }
 
-func TestSpeedTestWithMockClashAPI(t *testing.T) {
-	// Set up mock Clash API server that responds to /proxies/{tag}/delay
-	mockClash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "/proxies/") && strings.HasSuffix(r.URL.Path, "/delay") {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"delay": 68}`))
-			return
-		}
-		http.NotFound(w, r)
+func TestSpeedTestWithNativeProberAndDirect(t *testing.T) {
+	// Set up local 204 test server for direct latency testing
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
 	}))
-	defer mockClash.Close()
-
-	// Redirect clashAPIEndpoint to mock server
-	oldEndpoint := clashAPIEndpoint
-	clashAPIEndpoint = mockClash.Listener.Addr().String()
-	defer func() { clashAPIEndpoint = oldEndpoint }()
+	defer testServer.Close()
 
 	tmpDir := t.TempDir()
 	store, err := config.NewStore(tmpDir)
@@ -586,20 +574,58 @@ func TestSpeedTestWithMockClashAPI(t *testing.T) {
 		t.Fatalf("failed to init store: %v", err)
 	}
 
-	hy2Out := config.Outbound{
-		ID:      "hy2-test-node",
-		Tag:     "Singapore-HY2",
-		Type:    "hysteria2",
-		Server:  "198.51.100.1",
-		Port:    50551,
-		Enabled: true,
+	// Find the built-in direct outbound
+	var directID string
+	var blockID string
+	for _, o := range store.GetOutbounds() {
+		if o.Type == "direct" {
+			directID = o.ID
+		}
+		if o.Type == "block" {
+			blockID = o.ID
+		}
 	}
-	createdOut, err := store.AddOutbound(hy2Out)
-	if err != nil {
-		t.Fatalf("failed to add outbound: %v", err)
+	if directID == "" || blockID == "" {
+		t.Fatalf("expected default direct and block outbounds in store")
 	}
 
-	reqBody := `{"ids":["` + createdOut.ID + `"],"timeout":2}`
+	// 1. Verify HandleDeleteOutbound rejects deletion of direct and block
+	delReq := httptest.NewRequest(http.MethodDelete, "/api/v1/outbounds/"+directID, nil)
+	delReq = mux.SetURLVars(delReq, map[string]string{"id": directID})
+	delRr := httptest.NewRecorder()
+	HandleDeleteOutbound(store)(delRr, delReq)
+	if delRr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 when attempting to delete direct outbound, got %d", delRr.Code)
+	}
+
+	// 2. Add sample nodes and an urltest group
+	nodeA, _ := store.AddOutbound(config.Outbound{
+		Tag:     "node-A",
+		Type:    "vless",
+		Server:  "127.0.0.1",
+		Port:    1, // Will fail connect immediately
+		Enabled: true,
+	})
+	nodeB, _ := store.AddOutbound(config.Outbound{
+		Tag:     "node-B",
+		Type:    "vless",
+		Server:  "127.0.0.1",
+		Port:    1,
+		Enabled: true,
+	})
+
+	// Pre-populate nodeB with lower latency to test urltest group selection
+	_ = store.UpdateOutboundLatency(nodeA.ID, 180)
+	_ = store.UpdateOutboundLatency(nodeB.ID, 45)
+
+	grp, _ := store.AddGroup(config.Group{
+		Tag:       "auto-group",
+		Type:      "urltest",
+		Outbounds: []string{"node-A", "node-B"},
+	})
+
+	// 3. Test direct speed test using testServer.URL
+	reqBody := `{"ids":["` + directID + `"],"url":"` + testServer.URL + `","timeout":2}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/outbounds/speedtest", bytes.NewBufferString(reqBody))
 	rr := httptest.NewRecorder()
 	HandleSpeedTest(store)(rr, req)
@@ -617,36 +643,22 @@ func TestSpeedTestWithMockClashAPI(t *testing.T) {
 	}
 
 	if len(resp.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(resp.Results))
+		t.Fatalf("expected 1 result for direct speedtest, got %d", len(resp.Results))
 	}
 
-	if resp.Results[0].Latency != 68 {
-		t.Errorf("expected latency 68ms via Clash API, got %d", resp.Results[0].Latency)
+	if resp.Results[0].Latency <= 0 {
+		t.Errorf("expected positive latency for direct outbound, got %d", resp.Results[0].Latency)
 	}
 
-	// Test with float delay response (e.g. 142.8)
-	reqBodyFloat := `{"ids":["` + createdOut.ID + `"],"timeout":2}`
-	reqFloat := httptest.NewRequest(http.MethodPost, "/api/v1/outbounds/speedtest", bytes.NewBufferString(reqBodyFloat))
-	rrFloat := httptest.NewRecorder()
-	HandleSpeedTest(store)(rrFloat, reqFloat)
-	if rrFloat.Code != http.StatusOK {
-		t.Fatalf("expected 200 on float delay, got %d: %s", rrFloat.Code, rrFloat.Body.String())
-	}
-
-	// Verify latency was updated in store
-	var foundOut config.Outbound
-	var found bool
-	for _, o := range store.GetOutbounds() {
-		if o.ID == createdOut.ID {
-			foundOut = o
-			found = true
-			break
+	// 4. Verify URLTest group re-evaluation placed lowest latency node-B at index 0 and selected
+	for _, g := range store.GetGroups() {
+		if g.ID == grp.ID {
+			if g.Selected != "node-B" {
+				t.Errorf("expected auto-selected 'node-B' for urltest group, got %q", g.Selected)
+			}
+			if len(g.Outbounds) < 2 || g.Outbounds[0] != "node-B" {
+				t.Errorf("expected node-B at index 0 of outbounds, got %+v", g.Outbounds)
+			}
 		}
-	}
-	if !found {
-		t.Fatalf("outbound not found in store")
-	}
-	if foundOut.Latency != 68 {
-		t.Errorf("expected stored latency 68, got %d", foundOut.Latency)
 	}
 }
