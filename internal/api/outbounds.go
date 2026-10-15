@@ -256,7 +256,7 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 		}
 
 		testURL := strings.TrimSpace(req.URL)
-		if testURL == "" {
+		if testURL == "" || strings.HasPrefix(testURL, "https://www.gstatic.com") {
 			testURL = "http://cp.cloudflare.com/generate_204"
 		}
 
@@ -315,15 +315,19 @@ func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int
 	}
 	timeoutMs := timeoutSec * 1000
 
-	// Preferred fallback endpoints in order:
-	// 1. Primary requested URL or Cloudflare Anycast (port 80 HTTP, <10ms edge, no TLS cert requirements)
+	if testURL == "" || strings.HasPrefix(testURL, "https://www.gstatic.com") {
+		testURL = "http://cp.cloudflare.com/generate_204"
+	}
+
+	// Strictly use reliable HTTP (port 80) 204 endpoints. Never use HTTPS/443 to avoid TLS cert requirements and timeouts:
+	// 1. Primary requested URL or Cloudflare Anycast (port 80 HTTP, <10ms edge)
 	// 2. Google generate_204 (port 80 HTTP)
-	// 3. Google generate_204 (port 443 HTTPS)
+	// 3. Google connectivity check (port 80 HTTP)
 	endpoints := []string{testURL}
 	fallbackCandidates := []string{
 		"http://cp.cloudflare.com/generate_204",
 		"http://www.gstatic.com/generate_204",
-		"https://www.gstatic.com/generate_204",
+		"http://connectivitycheck.gstatic.com/generate_204",
 	}
 	for _, cand := range fallbackCandidates {
 		found := false

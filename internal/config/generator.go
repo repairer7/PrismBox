@@ -262,7 +262,7 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 
 		if grp.Type == "urltest" {
 			url := grp.URL
-			if url == "" {
+			if url == "" || strings.HasPrefix(url, "https://www.gstatic.com") {
 				url = "http://cp.cloudflare.com/generate_204"
 			}
 			grpMap["url"] = url

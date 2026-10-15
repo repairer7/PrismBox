@@ -115,7 +115,7 @@ func main() {
 }
 
 func printBanner(listenAddr, dataDir, kernelPath string) {
-	ver := "v" + strings.TrimLeft(Version, "v")
+	ver := "v" + strings.TrimPrefix(Version, "v")
 	banner := `
    ____       _               ____             
   |  _ \ _ __(_)___ _ __ ___ | __ )  _____  __ 
