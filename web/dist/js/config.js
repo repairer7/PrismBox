@@ -81,7 +81,8 @@
     // DNS
     "servers": { type: "array", desc: "Upstream DNS servers list" },
     "address": { type: "string", desc: "DNS server address (e.g. 'https://dns.google/dns-query', 'tls://1.1.1.1', 'udp://223.5.5.5')" },
-    "address_resolver": { type: "string", desc: "DNS server used to resolve this DNS server's domain" },
+    "domain_resolver": { type: "string", desc: "DNS server tag used to bootstrap this DNS server's domain (modern replacement for address_resolver)" },
+    "address_resolver": { type: "string", desc: "Legacy field for domain_resolver" },
     "detour": { type: "string", desc: "Outbound tag to route this DNS query through (e.g. 'direct', 'proxy')" },
     "strategy": { type: "string", desc: "DNS query domain strategy", options: ["prefer_ipv4", "prefer_ipv6", "ipv4_only", "ipv6_only"] },
     "disable_cache": { type: "boolean", desc: "Disable internal DNS query cache" },

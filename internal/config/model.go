@@ -318,6 +318,7 @@ type DNSServer struct {
 	Tag             string `json:"tag"`
 	Address         string `json:"address"`
 	AddressResolver string `json:"address_resolver,omitempty"`
+	DomainResolver  string `json:"domain_resolver,omitempty"`
 	Detour          string `json:"detour,omitempty"`
 	Strategy        string `json:"strategy,omitempty"`
 }

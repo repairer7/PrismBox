@@ -172,6 +172,12 @@ func TestGenerateSingBoxConfig_DNSEnabledProducesProperServersAndRules(t *testin
 	if s0["tag"] != "google" || s0["type"] != "https" || s0["server"] != "dns.google" || s0["path"] != "/dns-query" || s0["detour"] != "proxy" {
 		t.Errorf("unexpected dns server 0 content: %+v", s0)
 	}
+	if s0["domain_resolver"] != "local" {
+		t.Errorf("expected domain_resolver 'local', got %v", s0["domain_resolver"])
+	}
+	if _, hasOld := s0["address_resolver"]; hasOld {
+		t.Errorf("deprecated address_resolver should NOT be emitted in sing-box config: %+v", s0)
+	}
 	s1 := servers[1].(map[string]interface{})
 	if _, hasDetour := s1["detour"]; hasDetour {
 		t.Errorf("dns server with detour 'direct' should NOT emit detour field: %+v", s1)

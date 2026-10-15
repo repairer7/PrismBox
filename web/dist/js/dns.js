@@ -291,13 +291,15 @@
             {
               tag: 'dns-remote',
               address: 'https://1.1.1.1/dns-query',
-              address_resolver: 'dns-direct',
+              address_resolver: '',
+              domain_resolver: '',
               detour: ''
             },
             {
               tag: 'dns-direct',
               address: 'https://223.5.5.5/dns-query',
               address_resolver: '',
+              domain_resolver: '',
               detour: ''
             }
           ];
@@ -340,7 +342,14 @@
           // Clean up any direct detours to avoid sing-box fatal crash
           this.config.servers.forEach(s => {
             if (s.detour === 'direct') s.detour = '';
-            if (s.address_resolver === 'direct') s.address_resolver = '';
+            if (s.address_resolver === 'direct' || s.address_resolver === 'none') s.address_resolver = '';
+            if (s.domain_resolver === 'direct' || s.domain_resolver === 'none') s.domain_resolver = '';
+            // If server address is an IP (e.g. 1.1.1.1, 223.5.5.5, 8.8.8.8) and resolver was set to dns-direct, clear it
+            if ((s.address_resolver === 'dns-direct' || s.domain_resolver === 'dns-direct') &&
+                (s.address?.includes('1.1.1.1') || s.address?.includes('223.5.5.5') || s.address?.includes('8.8.8.8'))) {
+              s.address_resolver = '';
+              s.domain_resolver = '';
+            }
           });
 
           // Migrate legacy geosite field in rules to domain_suffix
@@ -451,7 +460,7 @@
               <code>${this.escapeHtml(srv.address)}</code>
             </td>
             <td>
-              ${srv.address_resolver ? `<span class="badge badge-neutral">${this.escapeHtml(srv.address_resolver)}</span>` : '<span class="text-muted">-</span>'}
+              ${(srv.domain_resolver || srv.address_resolver) ? `<span class="badge badge-neutral">${this.escapeHtml(srv.domain_resolver || srv.address_resolver)}</span>` : '<span class="text-muted">-</span>'}
             </td>
             <td>
               <span class="badge badge-success">${this.escapeHtml(srv.detour || 'direct')}</span>
@@ -574,6 +583,7 @@
         tag: 'dns-remote',
         address: 'https://1.1.1.1/dns-query',
         address_resolver: '',
+        domain_resolver: '',
         detour: ''
       };
 
@@ -585,6 +595,8 @@
           return `<option value="${this.escapeHtml(t)}" ${data.detour === t ? 'selected' : ''}>${this.escapeHtml(t)}</option>`;
         })
       ].join('');
+
+      const currentResolver = data.domain_resolver || data.address_resolver || '';
 
       const bodyHtml = `
         <div class="dns-server-form">
@@ -607,11 +619,11 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">${I18n.t('dns.server_resolver')} (Optional Server Tag)</label>
+            <label class="form-label">${I18n.t('dns.server_resolver')} (Domain Resolver)</label>
             <select class="form-select" id="modal-dns-resolver">
-              <option value="">None (Direct IP)</option>
+              <option value="">None (Direct IP / Default)</option>
               ${serverTags.filter(t => t !== data.tag).map(t => `
-                <option value="${this.escapeHtml(t)}" ${data.address_resolver === t ? 'selected' : ''}>${this.escapeHtml(t)}</option>
+                <option value="${this.escapeHtml(t)}" ${currentResolver === t ? 'selected' : ''}>${this.escapeHtml(t)}</option>
               `).join('')}
             </select>
           </div>
@@ -628,7 +640,7 @@
           const address = document.getElementById('modal-dns-address')?.value.trim();
           const rawDetour = document.getElementById('modal-dns-detour')?.value || '';
           const detour = (rawDetour === 'direct') ? '' : rawDetour;
-          const address_resolver = document.getElementById('modal-dns-resolver')?.value;
+          const domain_resolver = document.getElementById('modal-dns-resolver')?.value || '';
 
           if (!tag || !address) {
             window.showToast('Tag and Address are required', 'error');
@@ -639,7 +651,8 @@
             tag,
             address,
             detour,
-            address_resolver
+            domain_resolver,
+            address_resolver: domain_resolver
           };
 
           if (isEdit) {
