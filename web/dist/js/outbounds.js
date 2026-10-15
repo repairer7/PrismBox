@@ -76,9 +76,9 @@
           </div>
 
           <!-- Section: Policy Groups -->
-          <div class="groups-section mb-4">
-            <div class="panel-header mb-2">
-              <h3 class="panel-title">
+          <div class="groups-section mb-3">
+            <div class="section-subheader mb-2">
+              <h3 class="panel-title mb-0">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
                   <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
@@ -95,7 +95,7 @@
             </div>
 
             <div class="groups-grid" id="groups-grid-container">
-              <div class="glass-panel text-center py-3 text-muted">
+              <div class="glass-panel text-center py-2 text-muted">
                 <span class="spinner-sm"></span>
               </div>
             </div>
@@ -103,9 +103,9 @@
 
           <!-- Section: Nodes List Header with Search & Filters -->
           <div class="nodes-section">
-            <div class="panel-header mb-3">
+            <div class="nodes-header-bar mb-2">
               <div class="flex-center gap-sm">
-                <h3 class="panel-title">
+                <h3 class="panel-title mb-0">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"/>
                     <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
@@ -115,8 +115,8 @@
                 <span class="badge badge-neutral" id="nodes-count-badge">0</span>
               </div>
 
-              <div class="actions-row">
-                <div class="filter-pills" id="node-type-filters">
+              <div class="nodes-controls">
+                <div class="tab-pill-group" id="node-type-filters">
                   <button class="tab-pill ${this.filterType === 'all' ? 'active' : ''}" data-type="all">${I18n.t('common.all')}</button>
                   <button class="tab-pill ${this.filterType === 'vless' ? 'active' : ''}" data-type="vless">VLESS</button>
                   <button class="tab-pill ${this.filterType === 'hysteria2' ? 'active' : ''}" data-type="hysteria2">Hy2</button>

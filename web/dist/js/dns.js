@@ -125,11 +125,11 @@
               </div>
             </div>
 
-            <!-- DNS Servers Section -->
-            <div class="mb-4">
-              <div class="panel-header mb-2">
+            <!-- DNS Servers Section (Unified Table Card) -->
+            <div class="table-card mb-4">
+              <div class="table-card-header">
                 <div class="flex-center gap-sm">
-                  <h3 class="panel-title">
+                  <h3 class="panel-title mb-0">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
                       <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
@@ -150,7 +150,7 @@
                 </button>
               </div>
 
-              <div class="table-responsive">
+              <div class="table-responsive" style="border: none; border-radius: 0; box-shadow: none; background: transparent;">
                 <table class="glass-table" id="dns-servers-table">
                   <thead>
                     <tr>
@@ -168,11 +168,11 @@
               </div>
             </div>
 
-            <!-- DNS Rules Section -->
-            <div class="mb-4">
-              <div class="panel-header mb-2">
+            <!-- DNS Rules Section (Unified Table Card) -->
+            <div class="table-card mb-4">
+              <div class="table-card-header">
                 <div class="flex-center gap-sm">
-                  <h3 class="panel-title">
+                  <h3 class="panel-title mb-0">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="9 11 12 14 22 4"/>
                       <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
@@ -191,7 +191,7 @@
                 </button>
               </div>
 
-              <div class="table-responsive">
+              <div class="table-responsive" style="border: none; border-radius: 0; box-shadow: none; background: transparent;">
                 <table class="glass-table" id="dns-rules-table">
                   <thead>
                     <tr>

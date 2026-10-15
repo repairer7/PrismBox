@@ -81,11 +81,11 @@
             </div>
           </div>
 
-          <!-- Section: Routing Rules -->
-          <div class="rules-section mb-4">
-            <div class="panel-header mb-2">
+          <!-- Section: Routing Rules (Unified Table Card) -->
+          <div class="table-card mb-4">
+            <div class="table-card-header">
               <div class="flex-center gap-sm">
-                <h3 class="panel-title">
+                <h3 class="panel-title mb-0">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="8" y1="6" x2="21" y2="6"/>
                     <line x1="8" y1="12" x2="21" y2="12"/>
@@ -99,18 +99,16 @@
                 <span class="badge badge-neutral" id="rules-count-badge">0</span>
               </div>
 
-              <div class="actions-row">
-                <button class="btn btn-primary btn-sm" id="btn-add-rule">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                  <span>${I18n.t('routing.add_rule')}</span>
-                </button>
-              </div>
+              <button class="btn btn-primary btn-sm" id="btn-add-rule">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>${I18n.t('routing.add_rule')}</span>
+              </button>
             </div>
 
-            <div class="table-responsive">
+            <div class="table-responsive" style="border: none; border-radius: 0; box-shadow: none; background: transparent;">
               <table class="glass-table" id="rules-table">
                 <thead>
                   <tr>
@@ -135,9 +133,9 @@
 
           <!-- Section: Remote Rule Sets (.srs / .json) -->
           <div class="rulesets-section">
-            <div class="panel-header mb-2">
+            <div class="section-subheader mb-2">
               <div class="flex-center gap-sm">
-                <h3 class="panel-title">
+                <h3 class="panel-title mb-0">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polygon points="12 2 2 7 12 12 22 7 12 2"/>
                     <polyline points="2 17 12 22 22 17"/>
@@ -148,15 +146,13 @@
                 <span class="badge badge-neutral" id="rulesets-count-badge">0</span>
               </div>
 
-              <div class="actions-row">
-                <button class="btn btn-secondary btn-sm" id="btn-add-ruleset">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                  <span>${I18n.t('routing.add_ruleset')}</span>
-                </button>
-              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-add-ruleset">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>${I18n.t('routing.add_ruleset')}</span>
+              </button>
             </div>
 
             <div class="rulesets-grid" id="rulesets-grid-container">
