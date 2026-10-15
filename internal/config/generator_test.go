@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -527,3 +528,94 @@ func TestGenerateSingBoxConfig_TunAndMixedInbounds(t *testing.T) {
 		t.Errorf("unexpected mixed inbound: %+v", mixedMap)
 	}
 }
+
+// TestGenerateSingBoxConfig_NoDeprecatedGeoFields verifies that sing-box 1.12+ deprecated
+// "geosite" and "geoip" are never outputted and are cleanly converted.
+func TestGenerateSingBoxConfig_NoDeprecatedGeoFields(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Routing.RuleSets = []RuleSet{
+		{
+			Tag: "geosite-google",
+			URL: "https://example.com/geosite-google.srs",
+		},
+	}
+	cfg.DNS.Enabled = true
+	cfg.DNS.Servers = []DNSServer{
+		{Tag: "local", Address: "223.5.5.5"},
+		{Tag: "remote", Address: "https://1.1.1.1/dns-query"},
+	}
+	cfg.DNS.Rules = []DNSRule{
+		{
+			Server:  "local",
+			GeoSite: []string{"cn"},
+		},
+		{
+			Server:  "remote",
+			GeoSite: []string{"google"},
+		},
+	}
+	cfg.Routing.Rules = []Rule{
+		{
+			ID:       "r1",
+			Enabled:  true,
+			Outbound: "direct",
+			GeoSite:  []string{"cn"},
+			GeoIP:    []string{"private"},
+		},
+	}
+
+	data, err := GenerateSingBoxConfigFromModel(cfg)
+	if err != nil {
+		t.Fatalf("failed to generate config: %v", err)
+	}
+
+	rawJSON := string(data)
+	if strings.Contains(rawJSON, `"geosite"`) {
+		t.Errorf("generated config must NOT contain deprecated 'geosite' key: %s", rawJSON)
+	}
+	if strings.Contains(rawJSON, `"geoip"`) {
+		t.Errorf("generated config must NOT contain deprecated 'geoip' key: %s", rawJSON)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+
+	// Verify DNS rule 0 mapped cn -> domain_suffix: [".cn"]
+	dnsObj := parsed["dns"].(map[string]interface{})
+	dnsRules := dnsObj["rules"].([]interface{})
+	rule0 := dnsRules[0].(map[string]interface{})
+	suffixes, ok := rule0["domain_suffix"].([]interface{})
+	if !ok || len(suffixes) == 0 || suffixes[0] != ".cn" {
+		t.Errorf("expected domain_suffix [.cn] in dns rule 0, got %+v", rule0)
+	}
+
+	// Verify DNS rule 1 mapped google -> rule_set: ["geosite-google"]
+	rule1 := dnsRules[1].(map[string]interface{})
+	ruleSets, ok := rule1["rule_set"].([]interface{})
+	if !ok || len(ruleSets) == 0 || ruleSets[0] != "geosite-google" {
+		t.Errorf("expected rule_set [geosite-google] in dns rule 1, got %+v", rule1)
+	}
+
+	// Verify route rule mapped private -> ip_is_private: true
+	routeObj := parsed["route"].(map[string]interface{})
+	routeRules := routeObj["rules"].([]interface{})
+	// Find r1
+	var foundR1 map[string]interface{}
+	for _, rr := range routeRules {
+		rm := rr.(map[string]interface{})
+		if rm["outbound"] == "direct" && rm["ip_is_private"] == true {
+			foundR1 = rm
+			break
+		}
+	}
+	if foundR1 == nil {
+		t.Fatalf("did not find route rule with ip_is_private: true, rules: %+v", routeRules)
+	}
+	r1Suffixes := foundR1["domain_suffix"].([]interface{})
+	if len(r1Suffixes) == 0 || r1Suffixes[0] != ".cn" {
+		t.Errorf("expected domain_suffix [.cn] in route rule, got %+v", foundR1)
+	}
+}
+

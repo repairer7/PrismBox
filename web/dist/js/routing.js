@@ -237,8 +237,29 @@
       } catch (err) {
         console.error('[Routing] Load error:', err);
       } finally {
+        this.updateGlobalControls();
         this.renderRules();
         this.renderRuleSets();
+      }
+    }
+
+    /**
+     * Synchronize global controls (toggles, selects) with loaded routing state
+     */
+    updateGlobalControls() {
+      const sniffToggle = document.getElementById('route-sniff-toggle');
+      if (sniffToggle) {
+        sniffToggle.checked = this.routing.sniff !== false;
+      }
+
+      const sniffOverrideToggle = document.getElementById('route-sniff-override-toggle');
+      if (sniffOverrideToggle) {
+        sniffOverrideToggle.checked = !!this.routing.sniff_override_destination;
+      }
+
+      const strategySelect = document.getElementById('route-domain-strategy');
+      if (strategySelect && this.routing.domain_strategy) {
+        strategySelect.value = this.routing.domain_strategy;
       }
     }
 

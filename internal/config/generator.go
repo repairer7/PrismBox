@@ -92,6 +92,13 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		},
 	}
 
+	definedRuleSets := make(map[string]bool)
+	for _, rs := range cfg.Routing.RuleSets {
+		if rs.Tag != "" {
+			definedRuleSets[rs.Tag] = true
+		}
+	}
+
 	// 1. DNS section - ONLY included if cfg.DNS.Enabled is true
 	if cfg.DNS.Enabled {
 		dns := &SingBoxDNS{
@@ -114,17 +121,39 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 			if len(r.Domain) > 0 {
 				rule["domain"] = r.Domain
 			}
+			var suffixes []string
 			if len(r.DomainSuffix) > 0 {
-				rule["domain_suffix"] = r.DomainSuffix
+				suffixes = append(suffixes, r.DomainSuffix...)
+			}
+			var ruleSets []string
+			if len(r.RuleSet) > 0 {
+				ruleSets = append(ruleSets, r.RuleSet...)
+			}
+
+			// In sing-box 1.12+, "geosite" is removed.
+			// Map legacy or user geosite entries to domain_suffix or matching rule_set.
+			for _, gs := range r.GeoSite {
+				gsTrim := strings.TrimSpace(gs)
+				if gsTrim == "" {
+					continue
+				}
+				if definedRuleSets[gsTrim] {
+					ruleSets = append(ruleSets, gsTrim)
+				} else if definedRuleSets["geosite-"+gsTrim] {
+					ruleSets = append(ruleSets, "geosite-"+gsTrim)
+				} else if strings.EqualFold(gsTrim, "cn") {
+					suffixes = append(suffixes, ".cn")
+				}
+			}
+
+			if len(suffixes) > 0 {
+				rule["domain_suffix"] = dedupeStrings(suffixes)
+			}
+			if len(ruleSets) > 0 {
+				rule["rule_set"] = dedupeStrings(ruleSets)
 			}
 			if len(r.DomainKeyword) > 0 {
 				rule["domain_keyword"] = r.DomainKeyword
-			}
-			if len(r.GeoSite) > 0 {
-				rule["geosite"] = r.GeoSite
-			}
-			if len(r.RuleSet) > 0 {
-				rule["rule_set"] = r.RuleSet
 			}
 			if r.Outbound != "" {
 				rule["outbound"] = r.Outbound
@@ -352,8 +381,51 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		if len(r.Domain) > 0 {
 			ruleMap["domain"] = r.Domain
 		}
+		var suffixes []string
 		if len(r.DomainSuffix) > 0 {
-			ruleMap["domain_suffix"] = r.DomainSuffix
+			suffixes = append(suffixes, r.DomainSuffix...)
+		}
+		var ruleSets []string
+		if len(r.RuleSet) > 0 {
+			ruleSets = append(ruleSets, r.RuleSet...)
+		}
+
+		// In sing-box 1.12+, "geosite" and "geoip" are removed.
+		// Map GeoSite entries safely:
+		for _, gs := range r.GeoSite {
+			gsTrim := strings.TrimSpace(gs)
+			if gsTrim == "" {
+				continue
+			}
+			if definedRuleSets[gsTrim] {
+				ruleSets = append(ruleSets, gsTrim)
+			} else if definedRuleSets["geosite-"+gsTrim] {
+				ruleSets = append(ruleSets, "geosite-"+gsTrim)
+			} else if strings.EqualFold(gsTrim, "cn") {
+				suffixes = append(suffixes, ".cn")
+			}
+		}
+
+		// Map GeoIP entries safely:
+		for _, gi := range r.GeoIP {
+			giTrim := strings.TrimSpace(gi)
+			if giTrim == "" {
+				continue
+			}
+			if definedRuleSets[giTrim] {
+				ruleSets = append(ruleSets, giTrim)
+			} else if definedRuleSets["geoip-"+giTrim] {
+				ruleSets = append(ruleSets, "geoip-"+giTrim)
+			} else if strings.EqualFold(giTrim, "private") {
+				ruleMap["ip_is_private"] = true
+			}
+		}
+
+		if len(suffixes) > 0 {
+			ruleMap["domain_suffix"] = dedupeStrings(suffixes)
+		}
+		if len(ruleSets) > 0 {
+			ruleMap["rule_set"] = dedupeStrings(ruleSets)
 		}
 		if len(r.DomainKeyword) > 0 {
 			ruleMap["domain_keyword"] = r.DomainKeyword
@@ -363,15 +435,6 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		}
 		if len(r.IPCidr) > 0 {
 			ruleMap["ip_cidr"] = r.IPCidr
-		}
-		if len(r.GeoIP) > 0 {
-			ruleMap["geoip"] = r.GeoIP
-		}
-		if len(r.GeoSite) > 0 {
-			ruleMap["geosite"] = r.GeoSite
-		}
-		if len(r.RuleSet) > 0 {
-			ruleMap["rule_set"] = r.RuleSet
 		}
 		if len(r.Protocol) > 0 {
 			ruleMap["protocol"] = r.Protocol
@@ -527,3 +590,17 @@ func formatDNSServer(s DNSServer) map[string]interface{} {
 	}
 	return srv
 }
+
+func dedupeStrings(slice []string) []string {
+	seen := make(map[string]bool)
+	var res []string
+	for _, s := range slice {
+		s = strings.TrimSpace(s)
+		if s != "" && !seen[s] {
+			seen[s] = true
+			res = append(res, s)
+		}
+	}
+	return res
+}
+

@@ -306,7 +306,7 @@
           this.config.rules = [
             {
               id: 'rule-cn',
-              geosite: ['cn'],
+              domain_suffix: ['.cn'],
               server: 'dns-direct'
             }
           ];
@@ -336,6 +336,18 @@
           this.config = Object.assign(this.config, dnsRes);
           if (!this.config.servers) this.config.servers = [];
           if (!this.config.rules) this.config.rules = [];
+
+          // Migrate legacy geosite field in rules to domain_suffix
+          this.config.rules.forEach(r => {
+            if (r.geosite && r.geosite.length > 0) {
+              if (!r.domain_suffix) r.domain_suffix = [];
+              r.geosite.forEach(g => {
+                if (g === 'cn' && !r.domain_suffix.includes('.cn')) {
+                  r.domain_suffix.push('.cn');
+                }
+              });
+            }
+          });
         }
 
         const outTags = (Array.isArray(outboundsRes) ? outboundsRes : []).map(o => o.tag);
@@ -344,8 +356,43 @@
       } catch (err) {
         console.error('[DNS] Load error:', err);
       } finally {
+        this.updateGlobalControls();
         this.renderServers();
         this.renderRules();
+      }
+    }
+
+    /**
+     * Synchronize global controls (toggles, selects) with loaded DNS state
+     */
+    updateGlobalControls() {
+      const masterToggle = document.getElementById('master-dns-toggle');
+      if (masterToggle) {
+        masterToggle.checked = !!this.config.enabled;
+      }
+
+      const disabledSec = document.getElementById('dns-disabled-section');
+      const enabledSec = document.getElementById('dns-enabled-section');
+      if (disabledSec) {
+        disabledSec.style.display = this.config.enabled ? 'none' : 'block';
+      }
+      if (enabledSec) {
+        enabledSec.style.display = this.config.enabled ? 'block' : 'none';
+      }
+
+      const stratSelect = document.getElementById('dns-global-strategy');
+      if (stratSelect && this.config.strategy) {
+        stratSelect.value = this.config.strategy;
+      }
+
+      const cacheToggle = document.getElementById('dns-disable-cache-toggle');
+      if (cacheToggle) {
+        cacheToggle.checked = !!this.config.disable_cache;
+      }
+
+      const expireToggle = document.getElementById('dns-disable-expire-toggle');
+      if (expireToggle) {
+        expireToggle.checked = !!this.config.disable_expire;
       }
     }
 
@@ -690,10 +737,21 @@
           };
 
           const geosite = parseList('modal-dns-rule-geosite');
-          if (geosite.length) newRule.geosite = geosite;
+          if (geosite.length) {
+            newRule.geosite = geosite;
+            if (geosite.includes('cn')) {
+              if (!newRule.domain_suffix) newRule.domain_suffix = [];
+              if (!newRule.domain_suffix.includes('.cn')) newRule.domain_suffix.push('.cn');
+            }
+          }
 
           const suffix = parseList('modal-dns-rule-suffix');
-          if (suffix.length) newRule.domain_suffix = suffix;
+          if (suffix.length) {
+            if (!newRule.domain_suffix) newRule.domain_suffix = [];
+            suffix.forEach(s => {
+              if (!newRule.domain_suffix.includes(s)) newRule.domain_suffix.push(s);
+            });
+          }
 
           const domain = parseList('modal-dns-rule-domain');
           if (domain.length) newRule.domain = domain;
