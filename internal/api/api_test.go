@@ -624,6 +624,15 @@ func TestSpeedTestWithMockClashAPI(t *testing.T) {
 		t.Errorf("expected latency 68ms via Clash API, got %d", resp.Results[0].Latency)
 	}
 
+	// Test with float delay response (e.g. 142.8)
+	reqBodyFloat := `{"ids":["` + createdOut.ID + `"],"timeout":2}`
+	reqFloat := httptest.NewRequest(http.MethodPost, "/api/v1/outbounds/speedtest", bytes.NewBufferString(reqBodyFloat))
+	rrFloat := httptest.NewRecorder()
+	HandleSpeedTest(store)(rrFloat, reqFloat)
+	if rrFloat.Code != http.StatusOK {
+		t.Fatalf("expected 200 on float delay, got %d: %s", rrFloat.Code, rrFloat.Body.String())
+	}
+
 	// Verify latency was updated in store
 	var foundOut config.Outbound
 	var found bool

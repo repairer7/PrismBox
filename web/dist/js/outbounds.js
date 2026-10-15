@@ -453,7 +453,11 @@
       if (text) text.textContent = I18n.t('outbound.speedtesting');
 
       try {
-        const payload = ids ? { ids } : {};
+        const payload = {
+          ids: ids || undefined,
+          url: 'http://cp.cloudflare.com/generate_204',
+          timeout: 10
+        };
         const res = await API.post('outbounds/speedtest', payload);
 
         if (res && Array.isArray(res.results)) {
@@ -815,7 +819,7 @@
         tag: 'PROXY',
         type: 'selector',
         outbounds: [],
-        url: 'https://cp.cloudflare.com/generate_204',
+        url: 'http://cp.cloudflare.com/generate_204',
         interval: '3m',
         tolerance: 50
       };
@@ -854,7 +858,7 @@
           <div id="urltest-settings-row" style="display: ${data.type === 'urltest' ? 'block' : 'none'};">
             <div class="form-group">
               <label class="form-label">${I18n.t('outbound.group_url')}</label>
-              <input type="url" class="form-control" id="modal-group-url" value="${this.escapeHtml(data.url || 'https://cp.cloudflare.com/generate_204')}">
+              <input type="url" class="form-control" id="modal-group-url" value="${this.escapeHtml(data.url || 'http://cp.cloudflare.com/generate_204')}">
             </div>
             <div class="form-row">
               <div class="form-group">
@@ -896,7 +900,7 @@
           };
 
           if (type === 'urltest') {
-            payload.url = document.getElementById('modal-group-url')?.value.trim() || 'https://cp.cloudflare.com/generate_204';
+            payload.url = document.getElementById('modal-group-url')?.value.trim() || 'http://cp.cloudflare.com/generate_204';
             payload.interval = document.getElementById('modal-group-interval')?.value.trim() || '3m';
             payload.tolerance = parseInt(document.getElementById('modal-group-tolerance')?.value, 10) || 50;
           }

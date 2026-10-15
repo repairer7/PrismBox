@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -250,12 +252,12 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 
 		timeoutSec := req.Timeout
 		if timeoutSec <= 0 {
-			timeoutSec = 5
+			timeoutSec = 10
 		}
 
 		testURL := strings.TrimSpace(req.URL)
 		if testURL == "" {
-			testURL = "https://www.gstatic.com/generate_204"
+			testURL = "http://cp.cloudflare.com/generate_204"
 		}
 
 		allOutbounds := store.GetOutbounds()
@@ -305,22 +307,41 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 }
 
 // testSingleOutbound tests an outbound node latency.
-// It first attempts the sing-box native Clash API endpoint, then falls back to TCP dial if applicable.
+// It first attempts the sing-box native Clash API endpoint across reliable HTTP 204 test endpoints,
+// and gracefully falls back to direct TCP handshake if applicable.
 func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int) int {
+	if timeoutSec <= 0 {
+		timeoutSec = 10
+	}
 	timeoutMs := timeoutSec * 1000
-	if timeoutMs <= 0 {
-		timeoutMs = 5000
+
+	// Preferred fallback endpoints in order:
+	// 1. Primary requested URL or Cloudflare Anycast (port 80 HTTP, <10ms edge, no TLS cert requirements)
+	// 2. Google generate_204 (port 80 HTTP)
+	// 3. Google generate_204 (port 443 HTTPS)
+	endpoints := []string{testURL}
+	fallbackCandidates := []string{
+		"http://cp.cloudflare.com/generate_204",
+		"http://www.gstatic.com/generate_204",
+		"https://www.gstatic.com/generate_204",
+	}
+	for _, cand := range fallbackCandidates {
+		found := false
+		for _, ep := range endpoints {
+			if ep == cand {
+				found = true
+				break
+			}
+		}
+		if !found {
+			endpoints = append(endpoints, cand)
+		}
 	}
 
 	// 1. Prioritize sing-box Clash API (/proxies/:tag/delay) for true end-to-end proxy delay
 	if outbound.Tag != "" {
-		if l, err := queryClashAPIDelay(outbound.Tag, testURL, timeoutMs); err == nil && l > 0 {
-			return l
-		}
-
-		// If primary URL timed out or failed, try secondary Cloudflare 204 endpoint as backup
-		if testURL == "https://www.gstatic.com/generate_204" || testURL == "http://www.gstatic.com/generate_204" {
-			if l, err := queryClashAPIDelay(outbound.Tag, "http://cp.cloudflare.com/generate_204", timeoutMs); err == nil && l > 0 {
+		for _, ep := range endpoints {
+			if l, err := queryClashAPIDelay(outbound.Tag, ep, timeoutMs); err == nil && l > 0 {
 				return l
 			}
 		}
@@ -365,31 +386,42 @@ func queryClashAPIDelay(tag string, testURL string, timeoutMs int) (int, error) 
 	)
 
 	client := &http.Client{
-		Timeout: time.Duration(timeoutMs+1500) * time.Millisecond,
+		Timeout: time.Duration(timeoutMs+2000) * time.Millisecond,
 	}
 
 	resp, err := client.Get(apiURL)
 	if err != nil {
+		log.Printf("[speedtest] Request error querying Clash API for tag %q (%s): %v", tag, testURL, err)
 		return -1, err
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		log.Printf("[speedtest] Failed reading Clash API response for tag %q (%s): %v", tag, testURL, readErr)
+		return -1, readErr
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return -1, fmt.Errorf("clash api status %d", resp.StatusCode)
+		log.Printf("[speedtest] Clash API error for tag %q (%s): status=%d, body=%s", tag, testURL, resp.StatusCode, string(bodyBytes))
+		return -1, fmt.Errorf("clash api status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var data struct {
-		Delay int `json:"delay"`
+		Delay float64 `json:"delay"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.Unmarshal(bodyBytes, &data); err != nil {
+		log.Printf("[speedtest] Failed decoding Clash API JSON for tag %q (%s): %v, raw: %s", tag, testURL, err, string(bodyBytes))
 		return -1, err
 	}
 
-	if data.Delay <= 0 {
-		return -1, fmt.Errorf("invalid delay: %d", data.Delay)
+	delayMs := int(data.Delay)
+	if delayMs <= 0 {
+		log.Printf("[speedtest] Clash API returned non-positive delay for tag %q (%s): %v", tag, testURL, data.Delay)
+		return -1, fmt.Errorf("invalid delay: %v", data.Delay)
 	}
 
-	return data.Delay, nil
+	return delayMs, nil
 }
 
 // ==================== GROUPS ====================
