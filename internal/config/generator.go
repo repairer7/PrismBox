@@ -17,6 +17,7 @@ type SingBoxConfig struct {
 	Inbounds     []map[string]interface{} `json:"inbounds"`
 	Outbounds    []map[string]interface{} `json:"outbounds"`
 	Route        *SingBoxRoute            `json:"route,omitempty"`
+	HTTPClients  []map[string]interface{} `json:"http_clients,omitempty"`
 	Experimental *SingBoxExperimental     `json:"experimental,omitempty"`
 }
 
@@ -42,6 +43,7 @@ type SingBoxRoute struct {
 	RuleSets              []map[string]interface{} `json:"rule_set,omitempty"`
 	DefaultDomainResolver interface{}              `json:"default_domain_resolver,omitempty"`
 	AutoDetectInterface   bool                     `json:"auto_detect_interface"`
+	DefaultHTTPClient     string                   `json:"default_http_client,omitempty"`
 }
 
 // SingBoxExperimental defines experimental configurations such as Clash API and Cache File.
@@ -449,7 +451,10 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		route.Rules = append(route.Rules, ruleMap)
 	}
 
-	// RuleSets formatting
+	// HTTP Clients and RuleSets formatting (sing-box 1.14.0+)
+	httpClientTags := make(map[string]bool)
+	var httpClients []map[string]interface{}
+
 	for _, rs := range cfg.Routing.RuleSets {
 		rsType := rs.Type
 		if rsType == "" {
@@ -471,16 +476,54 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 			interval = "1d"
 		}
 
+		if rsType == "local" {
+			rsMap := map[string]interface{}{
+				"type":   "local",
+				"tag":    rs.Tag,
+				"format": rsFormat,
+				"path":   rs.URL,
+			}
+			route.RuleSets = append(route.RuleSets, rsMap)
+			continue
+		}
+
+		insecure := true
+		if rs.Insecure != nil {
+			insecure = *rs.Insecure
+		}
+
+		clientTag := "http-client-" + detour
+		if !insecure {
+			clientTag = "http-client-" + detour + "-secure"
+		}
+		if !httpClientTags[clientTag] {
+			httpClientTags[clientTag] = true
+			clientMap := map[string]interface{}{
+				"tag":    clientTag,
+				"detour": detour,
+				"tls": map[string]interface{}{
+					"enabled":  true,
+					"insecure": insecure,
+				},
+			}
+			httpClients = append(httpClients, clientMap)
+		}
+
 		rsMap := map[string]interface{}{
 			"type":            rsType,
 			"tag":             rs.Tag,
 			"format":          rsFormat,
 			"url":             rs.URL,
-			"download_detour": detour,
+			"http_client":     clientTag,
 			"update_interval": interval,
 		}
 
 		route.RuleSets = append(route.RuleSets, rsMap)
+	}
+
+	if len(httpClients) > 0 {
+		sb.HTTPClients = httpClients
+		route.DefaultHTTPClient = httpClients[0]["tag"].(string)
 	}
 
 	sb.Route = route
@@ -573,6 +616,13 @@ func formatDNSServer(s DNSServer) map[string]interface{} {
 		} else {
 			srv["type"] = "udp"
 			srv["server"] = addr
+		}
+	}
+
+	if srv["type"] == "https" || srv["type"] == "tls" || srv["type"] == "quic" {
+		srv["tls"] = map[string]interface{}{
+			"enabled":  true,
+			"insecure": true,
 		}
 	}
 

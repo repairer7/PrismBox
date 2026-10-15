@@ -247,6 +247,7 @@ type RuleSet struct {
 	DownloadDetour string `json:"download_detour,omitempty"`
 	UpdateInterval string `json:"update_interval,omitempty"`
 	Interval       string `json:"interval,omitempty"` // alias for compatibility
+	Insecure       *bool  `json:"insecure,omitempty"`
 }
 
 // DNSConfig defines DNS resolver settings.

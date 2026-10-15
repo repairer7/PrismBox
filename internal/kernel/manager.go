@@ -362,6 +362,7 @@ func (m *Manager) Start() error {
 	m.status = StatusRunning
 	m.lastError = ""
 	m.createdAt = time.Now()
+	m.crashCount = 0
 	m.stopAutoRestart = make(chan struct{})
 	pid := m.pid
 	m.mu.Unlock()
@@ -401,6 +402,9 @@ func (m *Manager) supervise(cmd *exec.Cmd, cancel context.CancelFunc) {
 	}
 
 	wasRunning := (m.status == StatusRunning)
+	if wasRunning && time.Since(m.createdAt) > 30*time.Second {
+		m.crashCount = 0
+	}
 	m.cmd = nil
 	m.pid = 0
 	stopCh := m.stopAutoRestart

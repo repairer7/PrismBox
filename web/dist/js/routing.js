@@ -673,6 +673,14 @@
               <input type="text" class="form-control" id="modal-rs-interval" value="1d">
             </div>
           </div>
+
+          <div class="form-group mt-2">
+            <label class="form-check-label d-flex align-items-center gap-2">
+              <input type="checkbox" id="modal-rs-insecure" checked>
+              <span>${I18n.t('routing.rs_insecure')}</span>
+            </label>
+            <div class="form-hint text-xs text-muted mt-1">${I18n.t('routing.rs_insecure_hint')}</div>
+          </div>
         </div>
       `;
 
@@ -687,6 +695,7 @@
           const url = document.getElementById('modal-rs-url')?.value.trim();
           const download_detour = document.getElementById('modal-rs-detour')?.value;
           const update_interval = document.getElementById('modal-rs-interval')?.value.trim() || '1d';
+          const insecure = document.getElementById('modal-rs-insecure')?.checked ?? true;
 
           if (!tag || !url) {
             window.showToast('Tag and URL are required', 'error');
@@ -699,7 +708,8 @@
             format,
             url,
             download_detour,
-            update_interval
+            update_interval,
+            insecure
           };
 
           try {

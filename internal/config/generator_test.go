@@ -396,11 +396,31 @@ func TestGenerateSingBoxConfig_RuleSetsProperlyFormatted(t *testing.T) {
 	if rs["format"] != "binary" {
 		t.Errorf("expected format binary, got %v", rs["format"])
 	}
-	if rs["download_detour"] != "direct" {
-		t.Errorf("expected download_detour direct, got %v", rs["download_detour"])
+	if rs["http_client"] != "http-client-direct" {
+		t.Errorf("expected http_client http-client-direct, got %v", rs["http_client"])
+	}
+	if _, hasDetour := rs["download_detour"]; hasDetour {
+		t.Errorf("deprecated download_detour should be omitted from rule_set")
 	}
 	if rs["update_interval"] != "1d" {
 		t.Errorf("expected update_interval 1d, got %v", rs["update_interval"])
+	}
+
+	// Verify top-level http_clients definition
+	httpClients, ok := parsed["http_clients"].([]interface{})
+	if !ok || len(httpClients) == 0 {
+		t.Fatalf("expected top-level http_clients array")
+	}
+	client0 := httpClients[0].(map[string]interface{})
+	if client0["tag"] != "http-client-direct" {
+		t.Errorf("expected http_client tag http-client-direct, got %v", client0["tag"])
+	}
+	if client0["detour"] != "direct" {
+		t.Errorf("expected http_client detour direct, got %v", client0["detour"])
+	}
+	tlsObj, ok := client0["tls"].(map[string]interface{})
+	if !ok || tlsObj["insecure"] != true {
+		t.Errorf("expected http_client tls.insecure == true, got %v", client0["tls"])
 	}
 
 	// Verify route rules referencing rule_set

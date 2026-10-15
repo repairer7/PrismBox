@@ -165,6 +165,8 @@
       'routing.rs_url': 'Remote URL',
       'routing.rs_detour': 'Download Detour',
       'routing.rs_interval': 'Update Interval',
+      'routing.rs_insecure': 'Skip TLS Certificate Verification',
+      'routing.rs_insecure_hint': 'Allow downloading from GitHub mirrors/proxies with custom, internal, or self-signed certificates without CA trust failures',
       'routing.delete_rule_confirm': 'Delete this routing rule?',
       'routing.delete_ruleset_confirm': 'Delete rule set "{tag}"?',
 
@@ -402,6 +404,8 @@
       'routing.rs_url': '下载地址',
       'routing.rs_detour': '下载出口',
       'routing.rs_interval': '更新间隔',
+      'routing.rs_insecure': '跳过 TLS 证书验证 (Insecure)',
+      'routing.rs_insecure_hint': '允许从自定义镜像站、加速代理或缺少系统根证书的容器环境中下载规则集，防止启动崩溃',
       'routing.delete_rule_confirm': '确定删除此分流规则吗？',
       'routing.delete_ruleset_confirm': '确定删除规则集 "{tag}" 吗？',
 
