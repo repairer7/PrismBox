@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  prismbox:
+    build: .
+    container_name: prismbox
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./data:/root/.prismbox
+      - ./sing-box:/usr/local/bin/sing-box
+    environment:
+      - TZ=Asia/Shanghai

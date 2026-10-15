@@ -1,0 +1,7 @@
+.git
+.github
+data/
+*.md
+*.exe
+prismbox
+sing-box
