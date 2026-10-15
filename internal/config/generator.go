@@ -441,7 +441,9 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		if len(r.PortRange) > 0 {
 			ruleMap["port_range"] = r.PortRange
 		}
-		if len(r.Network) > 0 {
+		if len(r.Network) == 1 {
+			ruleMap["network"] = r.Network[0]
+		} else if len(r.Network) > 1 {
 			ruleMap["network"] = r.Network
 		}
 		if len(r.SourceIPCidr) > 0 {

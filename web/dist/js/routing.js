@@ -319,6 +319,7 @@
         if (rule.domain_keyword?.length) criteriaBadges.push(`<span class="badge badge-primary">keyword: ${rule.domain_keyword.join(', ')}</span>`);
         if (rule.ip_cidr?.length) criteriaBadges.push(`<span class="badge badge-warning">cidr: ${rule.ip_cidr.join(', ')}</span>`);
         if (rule.rule_set?.length) criteriaBadges.push(`<span class="badge badge-pink">rule_set: ${rule.rule_set.join(', ')}</span>`);
+        if (rule.network?.length) criteriaBadges.push(`<span class="badge badge-warning">net: ${rule.network.join(', ')}</span>`);
         if (rule.protocol?.length) criteriaBadges.push(`<span class="badge badge-neutral">proto: ${rule.protocol.join(', ')}</span>`);
         if (rule.port?.length) criteriaBadges.push(`<span class="badge badge-neutral">port: ${rule.port.join(', ')}</span>`);
 
@@ -495,6 +496,7 @@
         description: '',
         outbound: 'direct',
         enabled: true,
+        network: [],
         domain_suffix: [],
         domain: [],
         domain_keyword: [],
@@ -515,7 +517,7 @@
           <div class="form-row">
             <div class="form-group" style="flex: 2;">
               <label class="form-label">${I18n.t('common.description')}</label>
-              <input type="text" class="form-control" id="modal-rule-desc" value="${this.escapeHtml(data.description || '')}" placeholder="Bypass domestic / Block ads">
+              <input type="text" class="form-control" id="modal-rule-desc" value="${this.escapeHtml(data.description || '')}" placeholder="Bypass domestic / Block ads / Block QUIC">
             </div>
             <div class="form-group" style="flex: 1;">
               <label class="form-label">${I18n.t('routing.target_outbound')} *</label>
@@ -559,13 +561,21 @@
           </div>
 
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">${I18n.t('routing.match_protocol')}</label>
-              <input type="text" class="form-control" id="modal-rule-proto" value="${(data.protocol || []).join(', ')}" placeholder="http, tls, dns, bittorrent">
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">${I18n.t('routing.match_network')}</label>
+              <select class="form-select" id="modal-rule-network">
+                <option value="">${I18n.t('routing.network_all')}</option>
+                <option value="udp" ${(data.network || []).includes('udp') ? 'selected' : ''}>UDP</option>
+                <option value="tcp" ${(data.network || []).includes('tcp') ? 'selected' : ''}>TCP</option>
+              </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="flex: 1;">
               <label class="form-label">${I18n.t('routing.match_port')}</label>
-              <input type="text" class="form-control" id="modal-rule-port" value="${(data.port || []).join(', ')}" placeholder="80, 443, 8080">
+              <input type="text" class="form-control" id="modal-rule-port" value="${(data.port || []).join(', ')}" placeholder="443, 80, 8080">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">${I18n.t('routing.match_protocol')}</label>
+              <input type="text" class="form-control" id="modal-rule-proto" value="${(data.protocol || []).join(', ')}" placeholder="quic, http, tls, dns">
             </div>
           </div>
         </div>
@@ -596,6 +606,9 @@
             outbound,
             enabled: existing ? existing.enabled : true
           };
+
+          const netVal = document.getElementById('modal-rule-network')?.value;
+          if (netVal) newRule.network = [netVal];
 
           const suffix = parseList('modal-rule-suffix');
           if (suffix.length) newRule.domain_suffix = suffix;
