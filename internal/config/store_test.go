@@ -37,9 +37,9 @@ func TestStoreInitialization(t *testing.T) {
 		t.Errorf("unexpected default inbound configuration: %+v", inb)
 	}
 
-	// Verify direct, block, dns-out outbounds
-	if len(cfg.Outbounds) < 3 {
-		t.Fatalf("expected at least 3 default outbounds, got %d", len(cfg.Outbounds))
+	// Verify direct and block outbounds (sing-box 1.13+ removes dns outbound)
+	if len(cfg.Outbounds) < 2 {
+		t.Fatalf("expected at least 2 default outbounds, got %d", len(cfg.Outbounds))
 	}
 	outTags := make(map[string]string)
 	for _, o := range cfg.Outbounds {
@@ -50,9 +50,6 @@ func TestStoreInitialization(t *testing.T) {
 	}
 	if outTags["block"] != "block" {
 		t.Errorf("missing default block outbound")
-	}
-	if outTags["dns-out"] != "dns" {
-		t.Errorf("missing default dns-out outbound")
 	}
 
 	// Verify routing with sniff and sniff_override_destination enabled

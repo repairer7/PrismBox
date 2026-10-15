@@ -100,12 +100,6 @@ func defaultConfig() PrismBoxConfig {
 				Type:    "block",
 				Enabled: true,
 			},
-			{
-				ID:      uuid.New().String(),
-				Tag:     "dns-out",
-				Type:    "dns",
-				Enabled: true,
-			},
 		},
 		Groups: make([]Group, 0),
 		Routing: Routing{

@@ -266,3 +266,59 @@ func TestSafeRestartPreValidation(t *testing.T) {
 	}
 }
 
+// TestValidateWithOfficialSingBoxBinary validates that generated configs pass official sing-box 1.14.3 check.
+func TestValidateWithOfficialSingBoxBinary(t *testing.T) {
+	// Look for sing-box or sing-box.exe in workspace root
+	binPath := filepath.Join("..", "..", "sing-box.exe")
+	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+		binPath = filepath.Join("..", "..", "sing-box")
+		if _, err := os.Stat(binPath); os.IsNotExist(err) {
+			t.Skip("Official sing-box binary not present in workspace root, skipping live CLI check")
+		}
+	}
+
+	tempDir, err := os.MkdirTemp("", "prismbox-live-val-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := config.NewStore(tempDir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	mgr := NewManager(binPath, tempDir)
+	mgr.SetStore(store)
+
+	// 1. Validate default generated config (no DNS, TProxy on 12345)
+	defaultCfgData, err := config.GenerateSingBoxConfig(store)
+	if err != nil {
+		t.Fatalf("failed to generate default config: %v", err)
+	}
+	if err := mgr.ValidateConfigData(defaultCfgData); err != nil {
+		t.Fatalf("default config failed official sing-box check: %v", err)
+	}
+
+	// 2. Validate with DNS enabled
+	cfg := store.GetConfig()
+	cfg.DNS = config.DNSConfig{
+		Enabled: true,
+		Servers: []config.DNSServer{
+			{Tag: "google", Address: "https://dns.google/dns-query", Detour: "direct"},
+			{Tag: "local", Address: "223.5.5.5", Detour: "direct"},
+		},
+		Rules: []config.DNSRule{
+			{DomainSuffix: []string{".cn", "baidu.com"}, Server: "local"},
+		},
+		Strategy: "prefer_ipv4",
+	}
+	withDNSData, err := config.GenerateSingBoxConfigFromModel(cfg)
+	if err != nil {
+		t.Fatalf("failed to generate with-dns config: %v", err)
+	}
+	if err := mgr.ValidateConfigData(withDNSData); err != nil {
+		t.Fatalf("with-dns config failed official sing-box check: %v", err)
+	}
+}
+

@@ -317,11 +317,12 @@ func parseVLESSLink(rawURI string) (config.Outbound, error) {
 		if sni != "" {
 			tlsMap["server_name"] = sni
 		}
-		if fp != "" {
-			tlsMap["utls"] = map[string]interface{}{
-				"enabled":     true,
-				"fingerprint": fp,
-			}
+		if fp == "" {
+			fp = "chrome"
+		}
+		tlsMap["utls"] = map[string]interface{}{
+			"enabled":     true,
+			"fingerprint": fp,
 		}
 		settings["tls"] = tlsMap
 	} else if sec == "tls" || (sec == "" && sni != "") {

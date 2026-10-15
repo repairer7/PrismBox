@@ -115,13 +115,17 @@ func main() {
 }
 
 func printBanner(listenAddr, dataDir, kernelPath string) {
+	ver := Version
+	if !strings.HasPrefix(ver, "v") {
+		ver = "v" + ver
+	}
 	banner := `
    ____       _               ____             
   |  _ \ _ __(_)___ _ __ ___ | __ )  _____  __ 
   | |_) | '__| / __| '_ ` + "`" + ` _ \|  _ \ / _ \ \/ / 
   |  __/| |  | \__ \ | | | | | |_) | (_) >  <  
   |_|   |_|  |_|___/_| |_| |_|____/ \___/_/\_\ 
-  PrismBox - WebUI Manager for sing-box v` + Version + `
+  PrismBox - WebUI Manager for sing-box ` + ver + `
 `
 	fmt.Print(banner)
 	fmt.Println(strings.Repeat("-", 60))

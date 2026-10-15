@@ -3,6 +3,10 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/url"
+	"strconv"
+	"strings"
 )
 
 // SingBoxConfig represents the top-level sing-box 1.14.x JSON schema.
@@ -36,7 +40,7 @@ type SingBoxDNS struct {
 type SingBoxRoute struct {
 	Rules                 []map[string]interface{} `json:"rules"`
 	RuleSets              []map[string]interface{} `json:"rule_set,omitempty"`
-	DefaultDomainResolver map[string]interface{}   `json:"default_domain_resolver,omitempty"`
+	DefaultDomainResolver interface{}              `json:"default_domain_resolver,omitempty"`
 	AutoDetectInterface   bool                     `json:"auto_detect_interface"`
 }
 
@@ -89,20 +93,7 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		}
 
 		for _, s := range cfg.DNS.Servers {
-			srv := map[string]interface{}{
-				"tag":     s.Tag,
-				"address": s.Address,
-			}
-			if s.AddressResolver != "" {
-				srv["address_resolver"] = s.AddressResolver
-			}
-			if s.Detour != "" {
-				srv["detour"] = s.Detour
-			}
-			if s.Strategy != "" {
-				srv["strategy"] = s.Strategy
-			}
-			dns.Servers = append(dns.Servers, srv)
+			dns.Servers = append(dns.Servers, formatDNSServer(s))
 		}
 
 		for _, r := range cfg.DNS.Rules {
@@ -147,13 +138,6 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 			"tag":  in.Tag,
 		}
 
-		if in.Sniff {
-			inboundMap["sniff"] = true
-		}
-		if in.SniffOverrideDestination {
-			inboundMap["sniff_override_destination"] = true
-		}
-
 		switch in.Type {
 		case "tproxy":
 			listen := in.Listen
@@ -162,11 +146,12 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 			}
 			inboundMap["listen"] = listen
 			inboundMap["listen_port"] = in.Port
-			network := in.Network
-			if network == "" {
-				network = "tcp,udp"
+			netLower := strings.ToLower(strings.TrimSpace(in.Network))
+			if netLower == "tcp" || netLower == "udp" {
+				inboundMap["network"] = netLower
 			}
-			inboundMap["network"] = network
+			// When network is "tcp,udp", "both", or empty, network is omitted
+			// so sing-box 1.14 automatically listens on both TCP and UDP.
 
 		case "tun":
 			ifName := in.InterfaceName
@@ -224,9 +209,9 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 	// 3. Outbounds section
 	existingTags := make(map[string]bool)
 
-	// Add user-defined outbounds: copy Settings map directly, add type/tag/server/server_port at top level
+	// Add user-defined outbounds (filter out legacy dns outbound)
 	for _, out := range cfg.Outbounds {
-		if !out.Enabled {
+		if !out.Enabled || out.Type == "dns" || out.Tag == "dns-out" {
 			continue
 		}
 
@@ -297,12 +282,6 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		sb.Outbounds = append(sb.Outbounds, map[string]interface{}{
 			"type": "block",
 			"tag":  "block",
-		})
-	}
-	if !existingTags["dns-out"] {
-		sb.Outbounds = append(sb.Outbounds, map[string]interface{}{
-			"type": "dns",
-			"tag":  "dns-out",
 		})
 	}
 
@@ -439,4 +418,101 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 	sb.Route = route
 
 	return json.MarshalIndent(sb, "", "  ")
+}
+
+// formatDNSServer converts a DNSServer into sing-box 1.14.x modern DNS server object.
+func formatDNSServer(s DNSServer) map[string]interface{} {
+	srv := map[string]interface{}{
+		"tag": s.Tag,
+	}
+
+	addr := strings.TrimSpace(s.Address)
+	if addr == "local" || addr == "" {
+		srv["type"] = "local"
+	} else if strings.HasPrefix(addr, "https://") {
+		srv["type"] = "https"
+		parsed, err := url.Parse(addr)
+		if err == nil {
+			srv["server"] = parsed.Hostname()
+			if parsed.Port() != "" {
+				if port, err := strconv.Atoi(parsed.Port()); err == nil && port > 0 {
+					srv["server_port"] = port
+				}
+			}
+			if parsed.Path != "" && parsed.Path != "/" {
+				srv["path"] = parsed.Path
+			}
+		} else {
+			srv["server"] = strings.TrimPrefix(addr, "https://")
+		}
+	} else if strings.HasPrefix(addr, "tls://") {
+		srv["type"] = "tls"
+		raw := strings.TrimPrefix(addr, "tls://")
+		host, portStr, err := net.SplitHostPort(raw)
+		if err == nil {
+			srv["server"] = host
+			if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+				srv["server_port"] = p
+			}
+		} else {
+			srv["server"] = raw
+		}
+	} else if strings.HasPrefix(addr, "quic://") {
+		srv["type"] = "quic"
+		raw := strings.TrimPrefix(addr, "quic://")
+		host, portStr, err := net.SplitHostPort(raw)
+		if err == nil {
+			srv["server"] = host
+			if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+				srv["server_port"] = p
+			}
+		} else {
+			srv["server"] = raw
+		}
+	} else if strings.HasPrefix(addr, "tcp://") {
+		srv["type"] = "tcp"
+		raw := strings.TrimPrefix(addr, "tcp://")
+		host, portStr, err := net.SplitHostPort(raw)
+		if err == nil {
+			srv["server"] = host
+			if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+				srv["server_port"] = p
+			}
+		} else {
+			srv["server"] = raw
+		}
+	} else if strings.HasPrefix(addr, "udp://") {
+		srv["type"] = "udp"
+		raw := strings.TrimPrefix(addr, "udp://")
+		host, portStr, err := net.SplitHostPort(raw)
+		if err == nil {
+			srv["server"] = host
+			if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+				srv["server_port"] = p
+			}
+		} else {
+			srv["server"] = raw
+		}
+	} else {
+		// Plain IP or host: default to UDP
+		host, portStr, err := net.SplitHostPort(addr)
+		if err == nil {
+			srv["type"] = "udp"
+			srv["server"] = host
+			if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+				srv["server_port"] = p
+			}
+		} else {
+			srv["type"] = "udp"
+			srv["server"] = addr
+		}
+	}
+
+	if s.Detour != "" {
+		srv["detour"] = s.Detour
+	}
+	if s.Strategy != "" {
+		srv["strategy"] = s.Strategy
+	}
+	return srv
 }

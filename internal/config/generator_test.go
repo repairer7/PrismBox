@@ -48,10 +48,10 @@ func TestGenerateSingBoxConfig_DefaultConfigProducesValidJSON(t *testing.T) {
 		t.Errorf("expected clash_api external_controller 127.0.0.1:9091, got %v", expSection["clash_api"])
 	}
 
-	// Verify default outbounds include direct, block, and dns-out
+	// Verify default outbounds include direct and block
 	outbounds, ok := parsed["outbounds"].([]interface{})
-	if !ok || len(outbounds) < 3 {
-		t.Fatalf("expected at least 3 default outbounds, got %d", len(outbounds))
+	if !ok || len(outbounds) < 2 {
+		t.Fatalf("expected at least 2 default outbounds, got %d", len(outbounds))
 	}
 
 	tags := make(map[string]bool)
@@ -59,7 +59,7 @@ func TestGenerateSingBoxConfig_DefaultConfigProducesValidJSON(t *testing.T) {
 		outMap := out.(map[string]interface{})
 		tags[outMap["tag"].(string)] = true
 	}
-	for _, expectedTag := range []string{"direct", "block", "dns-out"} {
+	for _, expectedTag := range []string{"direct", "block"} {
 		if !tags[expectedTag] {
 			t.Errorf("missing expected default outbound %s", expectedTag)
 		}
@@ -168,7 +168,7 @@ func TestGenerateSingBoxConfig_DNSEnabledProducesProperServersAndRules(t *testin
 		t.Fatalf("expected 2 dns servers, got %d", len(servers))
 	}
 	s0 := servers[0].(map[string]interface{})
-	if s0["tag"] != "google" || s0["address"] != "https://dns.google/dns-query" || s0["address_resolver"] != "local" || s0["detour"] != "proxy" {
+	if s0["tag"] != "google" || s0["type"] != "https" || s0["server"] != "dns.google" || s0["path"] != "/dns-query" || s0["detour"] != "proxy" {
 		t.Errorf("unexpected dns server 0 content: %+v", s0)
 	}
 
@@ -251,14 +251,8 @@ func TestGenerateSingBoxConfig_TProxyInboundGeneratesCorrectFormat(t *testing.T)
 	if inb["listen_port"] != float64(12345) {
 		t.Errorf("expected listen_port 12345, got %v", inb["listen_port"])
 	}
-	if inb["network"] != "tcp,udp" {
-		t.Errorf("expected network tcp,udp, got %v", inb["network"])
-	}
-	if inb["sniff"] != true {
-		t.Errorf("expected sniff true, got %v", inb["sniff"])
-	}
-	if inb["sniff_override_destination"] != true {
-		t.Errorf("expected sniff_override_destination true, got %v", inb["sniff_override_destination"])
+	if _, hasNet := inb["network"]; hasNet {
+		t.Errorf("expected network to be omitted for tcp,udp in sing-box 1.14.3, got %v", inb["network"])
 	}
 }
 
