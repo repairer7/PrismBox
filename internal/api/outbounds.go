@@ -307,26 +307,24 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 }
 
 // testSingleOutbound tests an outbound node latency.
-// It first attempts the sing-box native Clash API endpoint across reliable HTTP 204 test endpoints,
-// and gracefully falls back to direct TCP handshake if applicable.
+// It first attempts the sing-box native Clash API endpoint across reliable HTTP/HTTPS 204 test endpoints,
+// and gracefully falls back to a fast QUIC probe (for Hysteria 2 / TUIC) or direct TCP handshake.
 func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int) int {
 	if timeoutSec <= 0 {
 		timeoutSec = 10
 	}
 	timeoutMs := timeoutSec * 1000
 
-	if testURL == "" || strings.HasPrefix(testURL, "https://www.gstatic.com") {
+	if testURL == "" {
 		testURL = "http://cp.cloudflare.com/generate_204"
 	}
 
-	// Strictly use reliable HTTP (port 80) 204 endpoints. Never use HTTPS/443 to avoid TLS cert requirements and timeouts:
-	// 1. Primary requested URL or Cloudflare Anycast (port 80 HTTP, <10ms edge)
-	// 2. Google generate_204 (port 80 HTTP)
-	// 3. Google connectivity check (port 80 HTTP)
 	endpoints := []string{testURL}
 	fallbackCandidates := []string{
 		"http://cp.cloudflare.com/generate_204",
+		"https://cp.cloudflare.com/generate_204",
 		"http://www.gstatic.com/generate_204",
+		"https://www.gstatic.com/generate_204",
 		"http://connectivitycheck.gstatic.com/generate_204",
 	}
 	for _, cand := range fallbackCandidates {
@@ -351,21 +349,77 @@ func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int
 		}
 	}
 
-	// 2. Fallback: Direct TCP handshake (only applicable to TCP-based protocols, never UDP-only like Hysteria2 or TUIC)
+	// 2. Fallback:
 	outType := strings.ToLower(outbound.Type)
-	if outType != "hysteria2" && outType != "hy2" && outType != "tuic" {
-		if outbound.Server != "" && outbound.Port > 0 {
-			addr := net.JoinHostPort(outbound.Server, strconv.Itoa(outbound.Port))
-			start := time.Now()
-			conn, err := net.DialTimeout("tcp", addr, time.Duration(timeoutSec)*time.Second)
-			if err == nil {
-				_ = conn.Close()
-				return int(time.Since(start).Milliseconds())
+	if outbound.Server != "" && outbound.Port > 0 {
+		// For QUIC UDP-based protocols (Hysteria 2, TUIC), perform a fast RFC 9000 QUIC probe
+		if outType == "hysteria2" || outType == "hy2" || outType == "tuic" {
+			if l := testQUICLatency(outbound.Server, outbound.Port, timeoutSec); l > 0 {
+				return l
 			}
+		}
+
+		// Direct TCP handshake fallback for all protocols that support TCP
+		addr := net.JoinHostPort(outbound.Server, strconv.Itoa(outbound.Port))
+		start := time.Now()
+		conn, err := net.DialTimeout("tcp", addr, time.Duration(timeoutSec)*time.Second)
+		if err == nil {
+			_ = conn.Close()
+			return int(time.Since(start).Milliseconds())
 		}
 	}
 
 	return -1
+}
+
+// testQUICLatency sends a standard RFC 9000 QUIC version negotiation probe to measure UDP RTT.
+// Under RFC 9000 Section 5.2.2, any compliant QUIC server (Hysteria 2, TUIC) receiving an
+// Initial packet with an unallocated version will immediately respond with a Version Negotiation packet.
+func testQUICLatency(server string, port int, timeoutSec int) int {
+	if timeoutSec <= 0 {
+		timeoutSec = 3
+	}
+	if timeoutSec > 5 {
+		timeoutSec = 5
+	}
+	addr := net.JoinHostPort(server, strconv.Itoa(port))
+	conn, err := net.DialTimeout("udp", addr, time.Duration(timeoutSec)*time.Second)
+	if err != nil {
+		return -1
+	}
+	defer conn.Close()
+
+	_ = conn.SetDeadline(time.Now().Add(time.Duration(timeoutSec) * time.Second))
+
+	// Construct RFC 9000 Initial Packet with an unallocated version (0x1a2a3a4a)
+	// Padded to 1200 bytes as required by QUIC specifications.
+	packet := make([]byte, 1200)
+	packet[0] = 0xc0 // Long Header, Initial
+	packet[1] = 0x1a // Version: 0x1a2a3a4a
+	packet[2] = 0x2a
+	packet[3] = 0x3a
+	packet[4] = 0x4a
+	packet[5] = 8 // DCID length: 8
+	for i := 6; i < 14; i++ {
+		packet[i] = byte(i * 7)
+	}
+	packet[14] = 8 // SCID length: 8
+	for i := 15; i < 23; i++ {
+		packet[i] = byte(i * 13)
+	}
+
+	start := time.Now()
+	if _, err := conn.Write(packet); err != nil {
+		return -1
+	}
+
+	buf := make([]byte, 1500)
+	n, err := conn.Read(buf)
+	if err != nil || n < 5 {
+		return -1
+	}
+
+	return int(time.Since(start).Milliseconds())
 }
 
 var clashAPIEndpoint = "127.0.0.1:9091"

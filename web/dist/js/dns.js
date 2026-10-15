@@ -292,13 +292,13 @@
               tag: 'dns-remote',
               address: 'https://1.1.1.1/dns-query',
               address_resolver: 'dns-direct',
-              detour: 'direct'
+              detour: ''
             },
             {
               tag: 'dns-direct',
               address: 'https://223.5.5.5/dns-query',
               address_resolver: '',
-              detour: 'direct'
+              detour: ''
             }
           ];
         }
@@ -336,6 +336,12 @@
           this.config = Object.assign(this.config, dnsRes);
           if (!this.config.servers) this.config.servers = [];
           if (!this.config.rules) this.config.rules = [];
+
+          // Clean up any direct detours to avoid sing-box fatal crash
+          this.config.servers.forEach(s => {
+            if (s.detour === 'direct') s.detour = '';
+            if (s.address_resolver === 'direct') s.address_resolver = '';
+          });
 
           // Migrate legacy geosite field in rules to domain_suffix
           this.config.rules.forEach(r => {
@@ -568,13 +574,17 @@
         tag: 'dns-remote',
         address: 'https://1.1.1.1/dns-query',
         address_resolver: '',
-        detour: 'direct'
+        detour: ''
       };
 
       const serverTags = (this.config.servers || []).map(s => s.tag);
-      const detourOptions = this.availableOutbounds.map(t => {
-        return `<option value="${this.escapeHtml(t)}" ${data.detour === t ? 'selected' : ''}>${this.escapeHtml(t)}</option>`;
-      }).join('');
+      const proxyOutbounds = this.availableOutbounds.filter(t => t !== 'direct' && t !== 'block');
+      const detourOptions = [
+        `<option value="" ${(!data.detour || data.detour === 'direct') ? 'selected' : ''}>Direct (Default)</option>`,
+        ...proxyOutbounds.map(t => {
+          return `<option value="${this.escapeHtml(t)}" ${data.detour === t ? 'selected' : ''}>${this.escapeHtml(t)}</option>`;
+        })
+      ].join('');
 
       const bodyHtml = `
         <div class="dns-server-form">
@@ -616,7 +626,8 @@
         onSave: async () => {
           const tag = document.getElementById('modal-dns-tag')?.value.trim();
           const address = document.getElementById('modal-dns-address')?.value.trim();
-          const detour = document.getElementById('modal-dns-detour')?.value;
+          const rawDetour = document.getElementById('modal-dns-detour')?.value || '';
+          const detour = (rawDetour === 'direct') ? '' : rawDetour;
           const address_resolver = document.getElementById('modal-dns-resolver')?.value;
 
           if (!tag || !address) {

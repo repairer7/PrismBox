@@ -172,6 +172,10 @@ func TestGenerateSingBoxConfig_DNSEnabledProducesProperServersAndRules(t *testin
 	if s0["tag"] != "google" || s0["type"] != "https" || s0["server"] != "dns.google" || s0["path"] != "/dns-query" || s0["detour"] != "proxy" {
 		t.Errorf("unexpected dns server 0 content: %+v", s0)
 	}
+	s1 := servers[1].(map[string]interface{})
+	if _, hasDetour := s1["detour"]; hasDetour {
+		t.Errorf("dns server with detour 'direct' should NOT emit detour field: %+v", s1)
+	}
 
 	// Verify DNS Rules
 	rules := dnsMap["rules"].([]interface{})

@@ -582,8 +582,11 @@ func formatDNSServer(s DNSServer) map[string]interface{} {
 		}
 	}
 
-	if s.Detour != "" {
+	if s.Detour != "" && s.Detour != "direct" {
 		srv["detour"] = s.Detour
+	}
+	if s.AddressResolver != "" && s.AddressResolver != "direct" {
+		srv["address_resolver"] = s.AddressResolver
 	}
 	if s.Strategy != "" {
 		srv["strategy"] = s.Strategy
