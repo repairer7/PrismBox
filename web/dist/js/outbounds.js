@@ -504,6 +504,18 @@
             return false;
           }
 
+          try {
+            const res = await API.post('outbounds/import-links', { links: textarea.value });
+            if (res && res.success) {
+              const count = res.count || (res.outbounds && res.outbounds.length) || 1;
+              window.showToast(I18n.t('outbound.import_success', { count }), 'success');
+              await this.loadAll();
+              return true;
+            }
+          } catch (e) {
+            console.warn('[Import Link] API call failed, trying client-side fallback:', e);
+          }
+
           let addedCount = 0;
           for (const line of lines) {
             const parsed = this.parseShareLink(line);
@@ -537,6 +549,11 @@
         const u = new URL(link);
         const protocol = u.protocol.replace(':', '').toLowerCase();
 
+        const insecure = u.searchParams.get('insecure') === '1' ||
+          u.searchParams.get('insecure') === 'true' ||
+          u.searchParams.get('allowInsecure') === '1' ||
+          u.searchParams.get('allowInsecure') === 'true';
+
         let node = {
           type: protocol,
           tag: decodeURIComponent(u.hash ? u.hash.slice(1) : `${protocol}-${u.hostname}`),
@@ -564,25 +581,27 @@
           } else if (security === 'tls') {
             node.settings.tls = {
               enabled: true,
-              server_name: u.searchParams.get('sni') || u.hostname
+              server_name: u.searchParams.get('sni') || u.hostname,
+              insecure: insecure
             };
           }
         } else if (protocol === 'hysteria2' || protocol === 'hy2') {
           node.type = 'hysteria2';
           node.settings.password = decodeURIComponent(u.username || u.password || '');
           const sni = u.searchParams.get('sni');
-          if (sni) {
-            node.settings.tls = { enabled: true, server_name: sni };
-          }
+          const tls = { enabled: true };
+          if (sni) tls.server_name = sni;
+          if (insecure) tls.insecure = true;
+          node.settings.tls = tls;
         } else if (protocol === 'trojan') {
           node.settings.password = decodeURIComponent(u.username || '');
           const sni = u.searchParams.get('sni');
-          if (sni) {
-            node.settings.tls = { enabled: true, server_name: sni };
-          }
+          const tls = { enabled: true };
+          if (sni) tls.server_name = sni;
+          if (insecure) tls.insecure = true;
+          node.settings.tls = tls;
         } else if (protocol === 'ss') {
           node.type = 'shadowsocks';
-          // ss://base64(method:password)@hostname:port#tag or ss://method:password@hostname:port#tag
           let userInfo = u.username;
           if (!u.password && userInfo) {
             try {
@@ -598,7 +617,10 @@
           node.settings.uuid = u.username;
           node.settings.password = u.password;
           const sni = u.searchParams.get('sni');
-          if (sni) node.settings.tls = { enabled: true, server_name: sni };
+          const tls = { enabled: true };
+          if (sni) tls.server_name = sni;
+          if (insecure) tls.insecure = true;
+          node.settings.tls = tls;
         } else {
           return null;
         }
@@ -702,6 +724,20 @@
             <label class="form-label">Password / UUID / Secret</label>
             <input type="text" class="form-control" id="modal-node-secret" value="${this.escapeHtml(data.settings?.password || data.settings?.uuid || '')}">
           </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">SNI / Server Name</label>
+              <input type="text" class="form-control" id="modal-node-sni" value="${this.escapeHtml(data.settings?.tls?.server_name || '')}" placeholder="e.g. bing.com">
+            </div>
+            <div class="form-group d-flex flex-column justify-content-center">
+              <label class="form-label" style="margin-bottom: 8px;">TLS 证书校验</label>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="modal-node-insecure" ${data.settings?.tls?.insecure ? 'checked' : ''}>
+                <label class="form-check-label" for="modal-node-insecure">跳过证书校验 (Insecure / 允许自签证书)</label>
+              </div>
+            </div>
+          </div>
         </div>
       `;
 
@@ -716,6 +752,8 @@
           const server = document.getElementById('modal-node-server').value.trim();
           const port = parseInt(document.getElementById('modal-node-port').value, 10);
           const secret = document.getElementById('modal-node-secret').value.trim();
+          const sni = document.getElementById('modal-node-sni')?.value.trim();
+          const insecure = document.getElementById('modal-node-insecure')?.checked;
 
           if (!tag || !server || !port) {
             window.showToast('Tag, Server, and Port are required', 'error');
@@ -737,6 +775,18 @@
             payload.settings.uuid = secret;
           } else {
             payload.settings.password = secret;
+          }
+
+          if (type === 'hysteria2' || type === 'trojan' || type === 'vless' || type === 'tuic' || sni || insecure) {
+            payload.settings.tls = payload.settings.tls || { enabled: true };
+            if (sni) {
+              payload.settings.tls.server_name = sni;
+            }
+            if (insecure) {
+              payload.settings.tls.insecure = true;
+            } else {
+              delete payload.settings.tls.insecure;
+            }
           }
 
           try {
