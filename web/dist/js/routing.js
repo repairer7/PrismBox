@@ -131,9 +131,9 @@
             </div>
           </div>
 
-          <!-- Section: Remote Rule Sets (.srs / .json) -->
-          <div class="rulesets-section">
-            <div class="section-subheader mb-2">
+          <!-- Section: Remote Rule Sets (.srs / .json) - Unified Table Card -->
+          <div class="table-card mb-4">
+            <div class="table-card-header">
               <div class="flex-center gap-sm">
                 <h3 class="panel-title mb-0">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -146,7 +146,7 @@
                 <span class="badge badge-neutral" id="rulesets-count-badge">0</span>
               </div>
 
-              <button class="btn btn-secondary btn-sm" id="btn-add-ruleset">
+              <button class="btn btn-primary btn-sm" id="btn-add-ruleset">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
@@ -155,10 +155,26 @@
               </button>
             </div>
 
-            <div class="rulesets-grid" id="rulesets-grid-container">
-              <div class="glass-panel text-center py-3 text-muted">
-                <span class="spinner-sm"></span>
-              </div>
+            <div class="table-responsive" style="border: none; border-radius: 0; box-shadow: none; background: transparent;">
+              <table class="glass-table" id="rulesets-table">
+                <thead>
+                  <tr>
+                    <th style="width: 100px;">${I18n.t('routing.rs_format')}</th>
+                    <th style="width: 200px;">${I18n.t('routing.rs_tag')}</th>
+                    <th>${I18n.t('routing.rs_url')}</th>
+                    <th style="width: 140px;">${I18n.t('routing.rs_detour')}</th>
+                    <th style="width: 110px;">${I18n.t('routing.rs_interval')}</th>
+                    <th style="width: 80px; text-align: right;">${I18n.t('common.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody id="rulesets-tbody">
+                  <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">
+                      <span class="spinner-sm"></span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -409,55 +425,60 @@
     }
 
     /**
-     * Render RuleSets Grid
+     * Render RuleSets Table
      */
     renderRuleSets() {
-      const container = document.getElementById('rulesets-grid-container');
+      const tbody = document.getElementById('rulesets-tbody');
       const countBadge = document.getElementById('rulesets-count-badge');
-      if (!container) return;
+      if (!tbody) return;
 
       const ruleSets = this.routing.rule_sets || [];
       if (countBadge) countBadge.textContent = String(ruleSets.length);
 
       if (ruleSets.length === 0) {
-        container.innerHTML = `
-          <div class="glass-panel text-center py-3 text-muted" style="grid-column: 1 / -1;">
-            ${I18n.t('routing.no_rulesets')}
-          </div>
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="text-center py-4 text-muted">
+              ${I18n.t('routing.no_rulesets')}
+            </td>
+          </tr>
         `;
         return;
       }
 
-      container.innerHTML = ruleSets.map(rs => {
+      tbody.innerHTML = ruleSets.map(rs => {
+        const isSource = (rs.format || '').toLowerCase() === 'source';
+        const formatBadge = isSource
+          ? `<span class="badge badge-primary uppercase font-mono">${this.escapeHtml(rs.format || 'source')}</span>`
+          : `<span class="badge badge-pink uppercase font-mono">${this.escapeHtml(rs.format || 'binary')}</span>`;
+
+        const detour = rs.download_detour || 'direct';
+        const interval = rs.update_interval || rs.interval || '1d';
+
         return `
-          <div class="glass-panel ruleset-card" data-id="${rs.id}">
-            <div class="ruleset-card-header">
-              <div class="ruleset-title-box">
-                <span class="badge badge-pink uppercase">${this.escapeHtml(rs.format || 'binary')}</span>
-                <span class="ruleset-tag"><strong>${this.escapeHtml(rs.tag)}</strong></span>
+          <tr data-id="${rs.id}">
+            <td>${formatBadge}</td>
+            <td><strong class="text-white font-mono">${this.escapeHtml(rs.tag)}</strong></td>
+            <td>
+              <div style="max-width: 440px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this.escapeHtml(rs.url || '')}">
+                <code class="text-xs text-muted font-mono">${this.escapeHtml(rs.url || '')}</code>
               </div>
+            </td>
+            <td><span class="badge badge-neutral uppercase font-mono">${this.escapeHtml(detour)}</span></td>
+            <td><span class="font-mono text-muted text-xs">${this.escapeHtml(interval)}</span></td>
+            <td style="text-align: right;">
               <button class="btn-icon btn-sm btn-delete-ruleset text-danger" data-id="${rs.id}" title="${I18n.t('common.delete')}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"/>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
               </button>
-            </div>
-
-            <div class="ruleset-card-body mt-2">
-              <div class="ruleset-url text-xs text-muted">
-                <code>${this.escapeHtml(rs.url || '')}</code>
-              </div>
-              <div class="ruleset-meta mt-2 text-xs">
-                <span>Detour: <strong>${this.escapeHtml(rs.download_detour || 'direct')}</strong></span>
-                <span>Interval: <strong>${this.escapeHtml(rs.update_interval || rs.interval || '1d')}</strong></span>
-              </div>
-            </div>
-          </div>
+            </td>
+          </tr>
         `;
       }).join('');
 
-      container.querySelectorAll('.btn-delete-ruleset').forEach(btn => {
+      tbody.querySelectorAll('.btn-delete-ruleset').forEach(btn => {
         btn.addEventListener('click', () => {
           const rs = (this.routing.rule_sets || []).find(r => r.id === btn.dataset.id);
           if (rs) this.deleteRuleSet(rs);
