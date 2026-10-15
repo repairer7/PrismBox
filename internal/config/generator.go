@@ -55,10 +55,10 @@ type SingBoxClashAPI struct {
 	ExternalController string `json:"external_controller"`
 }
 
-// SingBoxCacheFile defines persistent caching for Clash API latency history and selection states.
+// SingBoxCacheFile defines persistent caching for Clash API latency history and route caches.
 type SingBoxCacheFile struct {
-	Enabled       bool `json:"enabled"`
-	StoreSelected bool `json:"store_selected,omitempty"`
+	Enabled bool   `json:"enabled"`
+	Path    string `json:"path,omitempty"`
 }
 
 // GenerateSingBoxConfig converts PrismBoxConfig stored in store into native sing-box 1.14.3 JSON.
@@ -86,8 +86,8 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 				ExternalController: "127.0.0.1:9091",
 			},
 			CacheFile: &SingBoxCacheFile{
-				Enabled:       true,
-				StoreSelected: true,
+				Enabled: true,
+				Path:    "cache.db",
 			},
 		},
 	}
