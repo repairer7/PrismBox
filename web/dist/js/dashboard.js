@@ -8,6 +8,13 @@
 
   const MAX_HISTORY = 60;
 
+  const SITES_CONFIG = [
+    { id: 'baidu', nameKey: 'dashboard.site_baidu', host: 'www.baidu.com', url: 'https://www.baidu.com/favicon.ico' },
+    { id: 'cloudflare', nameKey: 'dashboard.site_cloudflare', host: 'cp.cloudflare.com', url: 'https://cp.cloudflare.com/generate_204' },
+    { id: 'github', nameKey: 'dashboard.site_github', host: 'github.com', url: 'https://github.com/favicon.ico' },
+    { id: 'youtube', nameKey: 'dashboard.site_youtube', host: 'www.youtube.com', url: 'https://www.youtube.com/generate_204' }
+  ];
+
   class DashboardPage {
     constructor() {
       this.history = [];
@@ -34,6 +41,14 @@
 
       this.peakUpload = 0;
       this.peakDownload = 0;
+
+      this.isTestingSites = false;
+      this.siteResults = {
+        baidu: Array(10).fill(null),
+        cloudflare: Array(10).fill(null),
+        github: Array(10).fill(null),
+        youtube: Array(10).fill(null)
+      };
 
       // Seed history buffer
       const now = Date.now();
@@ -130,58 +145,180 @@
             </div>
           </div>
 
-          <!-- Total Traffic & Kernel Info Row -->
-          <div class="dashboard-meta-grid mb-3">
+          <!-- Total Traffic & Kernel Info: 3 Parallel Cards (Side-by-side, no blank space) -->
+          <div class="dash-meta-grid mb-3">
             <!-- Total Upload Card -->
-            <div class="glass-panel meta-card">
-              <div class="meta-icon upload-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
+            <div class="glass-panel stat-card dash-meta-card">
+              <div class="stat-header">
+                <span class="stat-label">${I18n.t('dashboard.total_upload')}</span>
+                <div class="stat-icon-wrapper upload">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </div>
               </div>
-              <div class="meta-body">
-                <span class="meta-label">${I18n.t('dashboard.total_upload')}</span>
-                <span class="meta-value text-cyan" id="stat-total-up">${window.formatBytes(this.lastStats.totalUpload)}</span>
+              <div class="stat-body">
+                <span class="stat-value text-purple" id="stat-total-up">${window.formatBytes(this.lastStats.totalUpload)}</span>
+                <span class="stat-subtext">${I18n.t('dashboard.total_upload_sub')}</span>
               </div>
             </div>
 
             <!-- Total Download Card -->
-            <div class="glass-panel meta-card">
-              <div class="meta-icon download-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+            <div class="glass-panel stat-card dash-meta-card">
+              <div class="stat-header">
+                <span class="stat-label">${I18n.t('dashboard.total_download')}</span>
+                <div class="stat-icon-wrapper download">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </div>
               </div>
-              <div class="meta-body">
-                <span class="meta-label">${I18n.t('dashboard.total_download')}</span>
-                <span class="meta-value text-pink" id="stat-total-down">${window.formatBytes(this.lastStats.totalDownload)}</span>
+              <div class="stat-body">
+                <span class="stat-value text-success" id="stat-total-down">${window.formatBytes(this.lastStats.totalDownload)}</span>
+                <span class="stat-subtext">${I18n.t('dashboard.total_download_sub')}</span>
               </div>
             </div>
 
             <!-- Kernel Info Card -->
-            <div class="glass-panel meta-card kernel-info-card">
-              <div class="meta-icon kernel-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-                  <polyline points="2 17 12 22 22 17"/>
-                  <polyline points="2 12 12 17 22 12"/>
-                </svg>
+            <div class="glass-panel stat-card dash-meta-card">
+              <div class="stat-header">
+                <span class="stat-label">${I18n.t('dashboard.core_info')}</span>
+                <span class="badge ${this.lastStats.kernelStatus === 'running' ? 'badge-success' : 'badge-danger'}" id="dash-kernel-badge">
+                  ${I18n.t('kernel.' + this.lastStats.kernelStatus) || this.lastStats.kernelStatus}
+                </span>
               </div>
-              <div class="meta-body kernel-details">
-                <div class="kernel-details-top">
-                  <span class="meta-label">${I18n.t('dashboard.core_info')}</span>
-                  <span class="badge ${this.lastStats.kernelStatus === 'running' ? 'badge-success' : 'badge-danger'}" id="dash-kernel-badge">
-                    ${I18n.t('kernel.' + this.lastStats.kernelStatus) || this.lastStats.kernelStatus}
-                  </span>
+              <div class="stat-body">
+                <div class="kernel-meta-version">sing-box <strong id="dash-version">${this.lastStats.kernelVersion || 'v1.14.3'}</strong></div>
+                <span class="stat-subtext">${I18n.t('dashboard.uptime')}: <strong id="dash-uptime">${window.formatUptime(this.lastStats.uptime)}</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Client Site Latency & Connectivity Panel (2x2 Grid with 10-bar charts) -->
+          <div class="glass-panel site-latency-panel mb-3">
+            <div class="panel-header site-panel-header">
+              <div class="site-latency-title-group">
+                <h3 class="panel-title">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  </svg>
+                  ${I18n.t('dashboard.site_latency_title')}
+                </h3>
+                <span class="site-latency-sub text-muted">${I18n.t('dashboard.site_latency_subtitle')}</span>
+              </div>
+              <div class="site-latency-actions">
+                <button class="btn btn-secondary btn-sm" id="btn-retest-sites" title="${I18n.t('dashboard.site_latency_retest')}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="icon-retest-sites">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                  </svg>
+                  <span id="text-retest-sites">${I18n.t('dashboard.site_latency_retest')}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Threshold indicator hint -->
+            <div class="site-threshold-bar">
+              <span class="threshold-tag green">≤ 150ms ${I18n.currentLang === 'zh' ? '优' : 'Fast'}</span>
+              <span class="threshold-tag red">> 150ms ${I18n.currentLang === 'zh' ? '高' : 'Slow'}</span>
+              <span class="threshold-hint-text">${I18n.t('dashboard.site_threshold_hint')}</span>
+            </div>
+
+            <!-- 2x2 Grid of Site Boxes -->
+            <div class="site-latency-grid">
+              <!-- Site 1: Baidu -->
+              <div class="site-card glass-panel" id="site-card-baidu">
+                <div class="site-card-header">
+                  <div class="site-brand">
+                    <div class="site-logo baidu-logo">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <circle cx="4.5" cy="9.5" r="2.5"/>
+                        <circle cx="9" cy="4.5" r="2.5"/>
+                        <circle cx="15" cy="4.5" r="2.5"/>
+                        <circle cx="19.5" cy="9.5" r="2.5"/>
+                        <path d="M12 11c-3.5 0-6 2.2-6 5.5 0 2 1.3 3.5 3 4.2 1 .4 2 .3 3-.2 1 .5 2 .6 3 .2 1.7-.7 3-2.2 3-4.2 0-3.3-2.5-5.5-6-5.5z"/>
+                      </svg>
+                    </div>
+                    <div class="site-meta">
+                      <span class="site-name">${I18n.t('dashboard.site_baidu')}</span>
+                      <span class="site-host">www.baidu.com</span>
+                    </div>
+                  </div>
+                  <div class="site-val-box">
+                    <span class="site-avg-val" id="site-val-baidu">-- ms</span>
+                  </div>
                 </div>
-                <div class="kernel-specs">
-                  <span>${I18n.t('dashboard.version')}: <strong id="dash-version">${this.lastStats.kernelVersion || 'v1.14.3'}</strong></span>
-                  <span>${I18n.t('dashboard.uptime')}: <strong id="dash-uptime">${window.formatUptime(this.lastStats.uptime)}</strong></span>
+                <div class="site-bars" id="site-bars-baidu"></div>
+              </div>
+
+              <!-- Site 2: Cloudflare -->
+              <div class="site-card glass-panel" id="site-card-cloudflare">
+                <div class="site-card-header">
+                  <div class="site-brand">
+                    <div class="site-logo cf-logo">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                      </svg>
+                    </div>
+                    <div class="site-meta">
+                      <span class="site-name">${I18n.t('dashboard.site_cloudflare')}</span>
+                      <span class="site-host">cp.cloudflare.com</span>
+                    </div>
+                  </div>
+                  <div class="site-val-box">
+                    <span class="site-avg-val" id="site-val-cloudflare">-- ms</span>
+                  </div>
                 </div>
+                <div class="site-bars" id="site-bars-cloudflare"></div>
+              </div>
+
+              <!-- Site 3: GitHub -->
+              <div class="site-card glass-panel" id="site-card-github">
+                <div class="site-card-header">
+                  <div class="site-brand">
+                    <div class="site-logo github-logo">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                      </svg>
+                    </div>
+                    <div class="site-meta">
+                      <span class="site-name">${I18n.t('dashboard.site_github')}</span>
+                      <span class="site-host">github.com</span>
+                    </div>
+                  </div>
+                  <div class="site-val-box">
+                    <span class="site-avg-val" id="site-val-github">-- ms</span>
+                  </div>
+                </div>
+                <div class="site-bars" id="site-bars-github"></div>
+              </div>
+
+              <!-- Site 4: YouTube -->
+              <div class="site-card glass-panel" id="site-card-youtube">
+                <div class="site-card-header">
+                  <div class="site-brand">
+                    <div class="site-logo yt-logo">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                      </svg>
+                    </div>
+                    <div class="site-meta">
+                      <span class="site-name">${I18n.t('dashboard.site_youtube')}</span>
+                      <span class="site-host">www.youtube.com</span>
+                    </div>
+                  </div>
+                  <div class="site-val-box">
+                    <span class="site-avg-val" id="site-val-youtube">-- ms</span>
+                  </div>
+                </div>
+                <div class="site-bars" id="site-bars-youtube"></div>
               </div>
             </div>
           </div>
@@ -252,6 +389,7 @@
       this.initChart();
       this.subscribeWebSocket();
       this.initLogs();
+      this.initSiteLatency();
     }
 
     /**
@@ -568,6 +706,151 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    /**
+     * Initialize 2x2 site connectivity & latency testing
+     */
+    initSiteLatency() {
+      const retestBtn = document.getElementById('btn-retest-sites');
+      if (retestBtn) {
+        retestBtn.addEventListener('click', () => {
+          this.runSiteLatencyTests();
+        });
+      }
+
+      // Initial render of empty bars
+      for (const site of SITES_CONFIG) {
+        this.updateSiteCard(site.id);
+      }
+
+      // Automatically trigger initial latency probe
+      setTimeout(() => {
+        if (!this.isDestroyed) {
+          this.runSiteLatencyTests();
+        }
+      }, 500);
+    }
+
+    /**
+     * Measure single HTTP round-trip latency directly from client browser
+     */
+    async pingSite(url) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+      const cacheBuster = `_t=${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const targetUrl = url.includes('?') ? `${url}&${cacheBuster}` : `${url}?${cacheBuster}`;
+      const start = performance.now();
+      try {
+        await fetch(targetUrl, {
+          method: 'GET',
+          mode: 'no-cors',
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        const duration = Math.round(performance.now() - start);
+        return Math.min(1000, Math.max(1, duration));
+      } catch (err) {
+        clearTimeout(timeoutId);
+        return 1000; // Timeout (>1000ms) or network blocked
+      }
+    }
+
+    /**
+     * Execute 10 samples per site and calculate average
+     */
+    async runSiteLatencyTests() {
+      if (this.isTestingSites || this.isDestroyed) return;
+      this.isTestingSites = true;
+
+      const retestBtn = document.getElementById('btn-retest-sites');
+      const retestText = document.getElementById('text-retest-sites');
+      if (retestBtn) retestBtn.disabled = true;
+      if (retestText) retestText.textContent = I18n.t('dashboard.site_latency_testing');
+
+      // Reset results & render empty state
+      for (const site of SITES_CONFIG) {
+        this.siteResults[site.id] = Array(10).fill(null);
+        this.updateSiteCard(site.id);
+      }
+
+      // Run 10 sequential rounds across the 4 sites
+      for (let sampleIdx = 0; sampleIdx < 10; sampleIdx++) {
+        if (this.isDestroyed) break;
+
+        // Concurrently ping the 4 sites in this round
+        await Promise.all(SITES_CONFIG.map(async (site) => {
+          if (this.isDestroyed) return;
+          const latency = await this.pingSite(site.url);
+          if (!this.isDestroyed) {
+            this.siteResults[site.id][sampleIdx] = latency;
+            this.updateSiteCard(site.id);
+          }
+        }));
+
+        // Brief delay between samples (80ms)
+        await new Promise(resolve => setTimeout(resolve, 80));
+      }
+
+      this.isTestingSites = false;
+      if (retestBtn) retestBtn.disabled = false;
+      if (retestText) retestText.textContent = I18n.t('dashboard.site_latency_retest');
+    }
+
+    /**
+     * Render the 10-bar chart and average latency for a site
+     */
+    updateSiteCard(siteId) {
+      const barsContainer = document.getElementById(`site-bars-${siteId}`);
+      const valEl = document.getElementById(`site-val-${siteId}`);
+      if (!barsContainer) return;
+
+      const samples = this.siteResults[siteId] || [];
+
+      // Render 10 individual bars
+      barsContainer.innerHTML = samples.map((val, idx) => {
+        let barClass = 'site-bar bar-idle';
+        let heightPct = 8;
+        let titleText = `#${idx + 1}: --`;
+
+        if (val !== null) {
+          if (val >= 1000) {
+            barClass = 'site-bar bar-red';
+            heightPct = 100;
+            titleText = `#${idx + 1}: ${I18n.t('dashboard.site_timeout')} (≥1000ms)`;
+          } else if (val > 150) {
+            barClass = 'site-bar bar-red';
+            heightPct = Math.max(6, Math.min(100, Math.round((val / 1000) * 100)));
+            titleText = `#${idx + 1}: ${val} ms (>150ms)`;
+          } else {
+            barClass = 'site-bar bar-green';
+            heightPct = Math.max(6, Math.min(100, Math.round((val / 1000) * 100)));
+            titleText = `#${idx + 1}: ${val} ms (≤150ms)`;
+          }
+        }
+
+        return `<div class="${barClass}" style="height: ${heightPct}%;" title="${titleText}"></div>`;
+      }).join('');
+
+      // Compute and display average latency
+      if (valEl) {
+        const completed = samples.filter(v => v !== null);
+        if (completed.length === 0) {
+          valEl.textContent = '-- ms';
+          valEl.className = 'site-avg-val';
+        } else {
+          const sum = completed.reduce((acc, v) => acc + v, 0);
+          const avg = Math.round(sum / completed.length);
+          if (avg >= 1000) {
+            valEl.textContent = I18n.t('dashboard.site_timeout');
+            valEl.className = 'site-avg-val slow';
+          } else {
+            valEl.textContent = `${avg} ms`;
+            valEl.className = `site-avg-val ${avg <= 150 ? 'good' : 'slow'}`;
+          }
+        }
+      }
     }
 
     destroy() {

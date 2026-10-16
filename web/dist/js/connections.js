@@ -41,27 +41,29 @@
       app.innerHTML = `
         <div class="connections-page">
           <!-- Top 4 Summary Stat Cards -->
-          <div class="stats-grid mb-3">
-            <div class="stat-card">
-              <div class="stat-header">
-                <span class="stat-title">${I18n.t('connections.stat_active')}</span>
+          <div class="stats-grid conn-summary-grid mb-3">
+            <div class="glass-panel stat-card conn-stat-card">
+              <div class="stat-header conn-stat-header">
+                <span class="stat-title" title="${I18n.t('connections.stat_active')}">${I18n.t('connections.stat_active')}</span>
                 <div class="stat-icon-wrapper accent">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                     <polyline points="15 3 21 3 21 9"/>
                     <line x1="10" y1="14" x2="21" y2="3"/>
                   </svg>
                 </div>
               </div>
-              <div class="stat-value" id="conn-stat-active">0</div>
-              <div class="stat-sub" id="conn-stat-active-sub">${I18n.t('connections.stat_active')}</div>
+              <div class="conn-stat-body">
+                <div class="stat-value conn-stat-value" id="conn-stat-active">0</div>
+                <div class="stat-sub conn-stat-sub" id="conn-stat-active-sub">${I18n.t('connections.sub_active_desc')}</div>
+              </div>
             </div>
 
-            <div class="stat-card">
-              <div class="stat-header">
-                <span class="stat-title">${I18n.t('connections.stat_clients')}</span>
+            <div class="glass-panel stat-card conn-stat-card">
+              <div class="stat-header conn-stat-header">
+                <span class="stat-title" title="${I18n.t('connections.stat_clients')}">${I18n.t('connections.stat_clients')}</span>
                 <div class="stat-icon-wrapper cyan">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                     <circle cx="9" cy="7" r="4"/>
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
@@ -69,36 +71,42 @@
                   </svg>
                 </div>
               </div>
-              <div class="stat-value" id="conn-stat-clients">0</div>
-              <div class="stat-sub" id="conn-stat-clients-sub">${I18n.t('connections.stat_clients')}</div>
+              <div class="conn-stat-body">
+                <div class="stat-value conn-stat-value" id="conn-stat-clients">0</div>
+                <div class="stat-sub conn-stat-sub" id="conn-stat-clients-sub">${I18n.t('connections.sub_clients_desc')}</div>
+              </div>
             </div>
 
-            <div class="stat-card">
-              <div class="stat-header">
-                <span class="stat-title">${I18n.t('connections.stat_down_speed')}</span>
+            <div class="glass-panel stat-card conn-stat-card">
+              <div class="stat-header conn-stat-header">
+                <span class="stat-title" title="${I18n.t('connections.stat_down_speed')}">${I18n.t('connections.stat_down_speed')}</span>
                 <div class="stat-icon-wrapper success">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <polyline points="19 12 12 19 5 12"/>
                   </svg>
                 </div>
               </div>
-              <div class="stat-value text-success" id="conn-stat-down-speed">0 B/s</div>
-              <div class="stat-sub" id="conn-stat-down-total">${I18n.t('connections.stat_total_down')}: 0 B</div>
+              <div class="conn-stat-body">
+                <div class="stat-value conn-stat-value text-success" id="conn-stat-down-speed">0 B/s</div>
+                <div class="stat-sub conn-stat-sub" id="conn-stat-down-total">${I18n.t('connections.stat_total_down')}: 0 B</div>
+              </div>
             </div>
 
-            <div class="stat-card">
-              <div class="stat-header">
-                <span class="stat-title">${I18n.t('connections.stat_up_speed')}</span>
+            <div class="glass-panel stat-card conn-stat-card">
+              <div class="stat-header conn-stat-header">
+                <span class="stat-title" title="${I18n.t('connections.stat_up_speed')}">${I18n.t('connections.stat_up_speed')}</span>
                 <div class="stat-icon-wrapper purple">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="19" x2="12" y2="5"/>
                     <polyline points="5 12 12 5 19 12"/>
                   </svg>
                 </div>
               </div>
-              <div class="stat-value text-purple" id="conn-stat-up-speed">0 B/s</div>
-              <div class="stat-sub" id="conn-stat-up-total">${I18n.t('connections.stat_total_up')}: 0 B</div>
+              <div class="conn-stat-body">
+                <div class="stat-value conn-stat-value text-purple" id="conn-stat-up-speed">0 B/s</div>
+                <div class="stat-sub conn-stat-sub" id="conn-stat-up-total">${I18n.t('connections.stat_total_up')}: 0 B</div>
+              </div>
             </div>
           </div>
 
@@ -429,7 +437,7 @@
       const upTotalEl = document.getElementById('conn-stat-up-total');
 
       if (activeEl) activeEl.textContent = this.stats.totalConnections;
-      if (activeSub) activeSub.textContent = `${this.stats.totalConnections} ${I18n.t('connections.stat_active')}`;
+      if (activeSub) activeSub.textContent = I18n.t('connections.sub_active_desc');
       if (clientsEl) clientsEl.textContent = this.stats.activeClients;
 
       if (downSpeedEl) downSpeedEl.textContent = window.formatSpeed(this.stats.liveDownloadSpeed);
