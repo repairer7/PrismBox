@@ -2934,57 +2934,9 @@ input, select, textarea {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.site-latency-title-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.site-latency-sub {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.site-threshold-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
   margin-bottom: 1.15rem;
-  padding: 0.45rem 0.85rem;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-glass);
-  flex-wrap: wrap;
-}
-
-.threshold-tag {
-  font-size: 0.7rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  padding: 0.15rem 0.45rem;
-  border-radius: var(--radius-xs);
-  white-space: nowrap;
-}
-
-.threshold-tag.green {
-  background: rgba(16, 185, 129, 0.2);
-  color: var(--success-light);
-  border: 1px solid rgba(16, 185, 129, 0.4);
-}
-
-.threshold-tag.red {
-  background: rgba(239, 68, 68, 0.2);
-  color: var(--danger-light);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-}
-
-.threshold-hint-text {
-  font-size: 0.74rem;
-  color: var(--text-secondary);
-  margin-left: auto;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border-glass);
 }
 
 .site-latency-grid {
@@ -3213,12 +3165,6 @@ input, select, textarea {
 
   .table-responsive {
     -webkit-overflow-scrolling: touch !important;
-  }
-
-  .threshold-hint-text {
-    width: 100% !important;
-    margin-left: 0 !important;
-    margin-top: 0.25rem !important;
   }
 }
 

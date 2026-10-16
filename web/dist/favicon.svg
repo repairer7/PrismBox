@@ -1,0 +1,16 @@
+<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="prismGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4338ca"/>
+    </linearGradient>
+    <linearGradient id="prismGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+  </defs>
+  <polygon points="16,3 29,26 3,26" fill="url(#prismGrad1)" opacity="0.95"/>
+  <polygon points="16,3 23,26 9,26" fill="url(#prismGrad2)" opacity="0.75"/>
+  <polygon points="16,3 16,26 3,26" fill="#ffffff" opacity="0.3"/>
+</svg>

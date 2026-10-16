@@ -276,8 +276,8 @@
             <div class="group-card-body mt-2">
               <div class="active-node-selector">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <label class="form-label text-xs mb-0">${isSelector ? I18n.t('outbound.active_node') : '当前生效优选节点'}:</label>
-                  ${!isSelector ? '<span class="badge badge-success badge-sm" style="font-size: 11px;">⚡ 自动优选 (Auto)</span>' : ''}
+                  <label class="form-label text-xs mb-0">${isSelector ? I18n.t('outbound.active_node') : I18n.t('outbound.active_optimal_node')}:</label>
+                  ${!isSelector ? `<span class="badge badge-success badge-sm" style="font-size: 11px;">${I18n.t('outbound.auto_optimal_badge')}</span>` : ''}
                 </div>
                 <select class="form-select form-select-sm group-active-select" data-id="${grp.id}" ${!isSelector ? 'disabled' : ''}>
                   ${includedTags.map(tag => {
@@ -291,8 +291,8 @@
 
               ${!isSelector ? `
                 <div class="group-meta mt-2 text-xs text-muted">
-                  <span>测速地址: <code>${this.escapeHtml(grp.url || 'http://cp.cloudflare.com/generate_204')}</code></span>
-                  <span class="ml-2">调度策略: <code>最低延迟优先</code></span>
+                  <span>${I18n.t('outbound.test_url_label')}: <code>${this.escapeHtml(grp.url || 'http://cp.cloudflare.com/generate_204')}</code></span>
+                  <span class="ml-2">${I18n.t('outbound.dispatch_policy')}: <code>${I18n.t('outbound.lowest_latency')}</code></span>
                 </div>
               ` : ''}
             </div>
@@ -405,7 +405,7 @@
                     <polyline points="12 6 12 12 16 14"></polyline>
                   </svg>
                   <span class="endpoint-addr" style="color: var(--emerald-light, #34d399);">
-                    <strong>直连网络 / 本地物理出站 (Direct)</strong>
+                    <strong>${I18n.t('outbound.direct_node_badge')}</strong>
                   </span>
                 ` : (node.type === 'block' ? `
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--rose, #f43f5e)" stroke-width="2">
@@ -413,7 +413,7 @@
                     <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
                   </svg>
                   <span class="endpoint-addr" style="color: var(--rose-light, #fb7185);">
-                    <strong>流量阻断 / 拦截丢弃 (Drop & Reject)</strong>
+                    <strong>${I18n.t('outbound.block_node_badge')}</strong>
                   </span>
                 ` : `
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -440,7 +440,7 @@
                 </div>
               ` : (node.type === 'hysteria2' ? `
                 <div class="node-sub-tag mt-1">
-                  <span class="badge badge-neutral badge-sm" title="${I18n.t('outbound.hy2_bbr_hint')}">⚙️ BBR (未配置带宽)</span>
+                  <span class="badge badge-neutral badge-sm" title="${I18n.t('outbound.hy2_bbr_hint')}">${I18n.t('outbound.hy2_bbr_badge')}</span>
                 </div>
               ` : '')}
             </div>
@@ -454,12 +454,12 @@
                     </svg>
                   </button>
                 ` : `
-                  <span class="badge badge-neutral badge-sm" style="font-size: 11px;">静默阻断</span>
+                  <span class="badge badge-neutral badge-sm" style="font-size: 11px;">${I18n.t('outbound.silent_drop')}</span>
                 `}
               </div>
 
               <div class="footer-right">
-                <button class="btn-icon btn-sm btn-edit-node" data-id="${node.id}" title="${node.type === 'direct' || node.type === 'block' ? '查看内置出站说明' : I18n.t('common.edit')}">
+                <button class="btn-icon btn-sm btn-edit-node" data-id="${node.id}" title="${node.type === 'direct' || node.type === 'block' ? I18n.t('outbound.view_builtin_details') : I18n.t('common.edit')}">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     ${node.type === 'direct' || node.type === 'block' ? `
                       <circle cx="12" cy="12" r="10"></circle>
@@ -751,7 +751,7 @@
       if (existing && (existing.type === 'direct' || existing.type === 'block')) {
         const isBlock = existing.type === 'block';
         window.showModal({
-          title: isBlock ? '阻断出站节点 (Block Outbound)' : '直连出站节点 (Direct Outbound)',
+          title: isBlock ? I18n.t('outbound.block_modal_title') : I18n.t('outbound.direct_modal_title'),
           bodyHtml: `
             <div class="system-node-info p-3">
               <div class="d-flex align-items-center mb-3">
@@ -761,15 +761,12 @@
                 <h4 style="margin: 0;">${this.escapeHtml(existing.tag)}</h4>
               </div>
               <p style="line-height: 1.6; color: var(--text-secondary, #94a3b8);">
-                ${isBlock 
-                  ? '这是 sing-box 系统核心内置的<strong>流量阻断出站节点</strong>。<br>当在“分流配置”中将规则动作目标指定为 <code>block</code> 时，所有匹配到的网络连接都会被 sing-box 核心直接静默拦截并丢弃（例如广告拦截、隐私防护、恶意追踪等）。<br><br>该节点属于系统级内置规则动作终点，<strong>无需且不支持配置外部服务器与端口</strong>。'
-                  : '这是 sing-box 系统核心内置的<strong>直连出站节点</strong>。<br>当分流规则动作目标为 <code>direct</code> 时，网络流量将绕过代理，直接通过本机物理网卡连接互联网。<br><br>您可以在节点卡片上点击<strong>测速按钮</strong>，检测本机直接访问互联网的物理网络延迟。该节点无需配置外部代理服务器。'
-                }
+                ${isBlock ? I18n.t('outbound.block_modal_desc') : I18n.t('outbound.direct_modal_desc')}
               </p>
               <div class="form-group mt-3">
-                <label class="form-label">${I18n.t('common.tag')} (系统出站标识)</label>
+                <label class="form-label">${I18n.t('common.tag')} ${I18n.t('outbound.builtin_system_tag')}</label>
                 <input type="text" class="form-control" value="${this.escapeHtml(existing.tag)}" readonly disabled>
-                <small class="text-muted">系统核心内置节点标识固定，不支持重命名或删除。</small>
+                <small class="text-muted">${I18n.t('outbound.builtin_tag_fixed_hint')}</small>
               </div>
             </div>
           `,
@@ -832,10 +829,10 @@
               <input type="text" class="form-control" id="modal-node-sni" value="${this.escapeHtml(data.settings?.tls?.server_name || '')}" placeholder="e.g. bing.com">
             </div>
             <div class="form-group d-flex flex-column justify-content-center">
-              <label class="form-label" style="margin-bottom: 8px;">TLS 证书校验</label>
+              <label class="form-label" style="margin-bottom: 8px;">${I18n.t('outbound.tls_verify_title')}</label>
               <div class="form-check">
                 <input type="checkbox" class="form-check-input" id="modal-node-insecure" ${data.settings?.tls?.insecure ? 'checked' : ''}>
-                <label class="form-check-label" for="modal-node-insecure">跳过证书校验 (Insecure / 允许自签证书)</label>
+                <label class="form-check-label" for="modal-node-insecure">${I18n.t('outbound.skip_cert_verify')}</label>
               </div>
             </div>
           </div>
@@ -846,18 +843,18 @@
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
               </svg>
-              <span>Hysteria 2 Brutal 流控与混淆配置</span>
+              <span>${I18n.t('outbound.hy2_brutal_title')}</span>
             </div>
 
             <div class="form-row">
               <div class="form-group" style="flex: 1;">
                 <label class="form-label">${I18n.t('outbound.up_mbps')}</label>
-                <input type="number" class="form-control font-mono" id="modal-node-up-mbps" value="${data.settings?.up_mbps || ''}" placeholder="例如: 50" min="1">
+                <input type="number" class="form-control font-mono" id="modal-node-up-mbps" value="${data.settings?.up_mbps || ''}" placeholder="50" min="1">
                 <small class="text-muted d-block mt-1">${I18n.t('outbound.up_mbps_desc')}</small>
               </div>
               <div class="form-group" style="flex: 1;">
                 <label class="form-label">${I18n.t('outbound.down_mbps')}</label>
-                <input type="number" class="form-control font-mono" id="modal-node-down-mbps" value="${data.settings?.down_mbps || ''}" placeholder="例如: 300" min="1">
+                <input type="number" class="form-control font-mono" id="modal-node-down-mbps" value="${data.settings?.down_mbps || ''}" placeholder="300" min="1">
                 <small class="text-muted d-block mt-1">${I18n.t('outbound.down_mbps_desc')}</small>
               </div>
             </div>
@@ -865,11 +862,11 @@
             <div class="form-row mt-2">
               <div class="form-group" style="flex: 1;">
                 <label class="form-label">${I18n.t('outbound.obfs_type')}</label>
-                <input type="text" class="form-control font-mono" id="modal-node-obfs-type" value="${this.escapeHtml(data.settings?.obfs?.type || '')}" placeholder="salamander (可选)">
+                <input type="text" class="form-control font-mono" id="modal-node-obfs-type" value="${this.escapeHtml(data.settings?.obfs?.type || '')}" placeholder="salamander ${I18n.t('outbound.optional_hint')}">
               </div>
               <div class="form-group" style="flex: 1;">
                 <label class="form-label">${I18n.t('outbound.obfs_password')}</label>
-                <input type="text" class="form-control font-mono" id="modal-node-obfs-pass" value="${this.escapeHtml(data.settings?.obfs?.password || '')}" placeholder="混淆密码 (可选)">
+                <input type="text" class="form-control font-mono" id="modal-node-obfs-pass" value="${this.escapeHtml(data.settings?.obfs?.password || '')}" placeholder="${I18n.t('outbound.optional_hint')}">
               </div>
             </div>
           </div>
@@ -1107,7 +1104,7 @@
      */
     deleteNode(node) {
       if (node.type === 'direct' || node.type === 'block') {
-        window.showToast('系统核心内置出站节点不支持删除', 'warning');
+        window.showToast(I18n.t('outbound.builtin_delete_warning'), 'warning');
         return;
       }
 

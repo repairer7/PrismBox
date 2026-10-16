@@ -202,20 +202,17 @@
             </div>
           </div>
 
-          <!-- Client Site Latency & Connectivity Panel (2x2 Grid with 10-bar charts) -->
+          <!-- Client Site Latency & Connectivity Panel (2x2 Grid with 10-Square Blocks) -->
           <div class="glass-panel site-latency-panel mb-3">
             <div class="panel-header site-panel-header">
-              <div class="site-latency-title-group">
-                <h3 class="panel-title">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="2" y1="12" x2="22" y2="12"/>
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                  </svg>
-                  ${I18n.t('dashboard.site_latency_title')}
-                </h3>
-                <span class="site-latency-sub text-muted">${I18n.t('dashboard.site_latency_subtitle')}</span>
-              </div>
+              <h3 class="panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                ${I18n.t('dashboard.site_latency_title')}
+              </h3>
               <div class="site-latency-actions">
                 <button class="btn btn-secondary btn-sm" id="btn-retest-sites" title="${I18n.t('dashboard.site_latency_retest')}">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="icon-retest-sites">
@@ -226,13 +223,6 @@
                   <span id="text-retest-sites">${I18n.t('dashboard.site_latency_retest')}</span>
                 </button>
               </div>
-            </div>
-
-            <!-- Threshold indicator hint -->
-            <div class="site-threshold-bar">
-              <span class="threshold-tag green">≤ 150ms ${I18n.currentLang === 'zh' ? '优' : 'Fast'}</span>
-              <span class="threshold-tag red">> 150ms ${I18n.currentLang === 'zh' ? '高' : 'Slow'}</span>
-              <span class="threshold-hint-text">${I18n.t('dashboard.site_threshold_hint')}</span>
             </div>
 
             <!-- 2x2 Grid of Site Boxes -->
@@ -809,18 +799,18 @@
           if (val >= 1000) {
             blockClass = 'site-block block-red';
             titleText = I18n.currentLang === 'zh'
-              ? `第 ${idx + 1} 次测速: ${I18n.t('dashboard.site_timeout')} (≥1000ms)`
-              : `Test #${idx + 1}: ${I18n.t('dashboard.site_timeout')} (≥1000ms)`;
+              ? `第 ${idx + 1} 次测速: ${I18n.t('dashboard.site_timeout')}`
+              : `Test #${idx + 1}: ${I18n.t('dashboard.site_timeout')}`;
           } else if (val > 150) {
             blockClass = 'site-block block-red';
             titleText = I18n.currentLang === 'zh'
-              ? `第 ${idx + 1} 次测速: ${val} ms (>150ms)`
-              : `Test #${idx + 1}: ${val} ms (>150ms)`;
+              ? `第 ${idx + 1} 次测速: ${val} ms`
+              : `Test #${idx + 1}: ${val} ms`;
           } else {
             blockClass = 'site-block block-green';
             titleText = I18n.currentLang === 'zh'
-              ? `第 ${idx + 1} 次测速: ${val} ms (≤150ms)`
-              : `Test #${idx + 1}: ${val} ms (≤150ms)`;
+              ? `第 ${idx + 1} 次测速: ${val} ms`
+              : `Test #${idx + 1}: ${val} ms`;
           }
         }
 
