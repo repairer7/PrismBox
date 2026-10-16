@@ -2898,23 +2898,18 @@ input, select, textarea {
 }
 
 .dash-meta-card {
-  padding: 1.25rem 1.4rem;
+  padding: 1.35rem 1.4rem;
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   justify-content: space-between;
   min-height: 125px;
 }
 
-.dash-meta-card .stat-header {
+.dash-meta-label-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.4rem;
-}
-
-.dash-meta-card .stat-body {
-  display: flex;
-  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
 }
 
 .kernel-meta-version {
@@ -2926,7 +2921,7 @@ input, select, textarea {
 }
 
 /* ==========================================================================
-   25. Client Site Latency & Connectivity (2x2 Grid with 10-Bar Charts)
+   25. Client Site Latency & Connectivity (2x2 Grid with 10-Square Blocks)
    ========================================================================== */
 .site-latency-panel {
   padding: 1.35rem;
@@ -3003,7 +2998,7 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 0.85rem;
+  gap: 0.95rem;
   border-radius: var(--radius-md);
   background: rgba(14, 14, 34, 0.65);
 }
@@ -3054,25 +3049,17 @@ input, select, textarea {
   border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
-.site-meta {
-  display: flex;
-  flex-direction: column;
-}
-
 .site-name {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #ffffff;
-}
-
-.site-host {
-  font-size: 0.72rem;
-  color: var(--text-dim);
-  font-family: var(--font-mono);
+  line-height: 1.2;
 }
 
 .site-val-box {
   text-align: right;
+  display: flex;
+  align-items: center;
 }
 
 .site-avg-val {
@@ -3080,6 +3067,7 @@ input, select, textarea {
   font-family: var(--font-mono);
   font-weight: 800;
   color: var(--text-secondary);
+  line-height: 1;
   transition: color var(--transition-normal);
 }
 
@@ -3093,45 +3081,48 @@ input, select, textarea {
   text-shadow: 0 0 10px var(--danger-glow);
 }
 
-.site-bars {
-  display: flex;
-  align-items: flex-end;
-  height: 48px;
-  gap: 5px;
-  background: rgba(0, 0, 0, 0.32);
-  padding: 5px 6px;
+/* 10 Equal Squares Grid for Latency Rounds */
+.site-blocks-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 6px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-glass);
+  box-sizing: border-box;
 }
 
-.site-bar {
-  flex: 1;
-  border-radius: 2px 2px 0 0;
-  min-height: 4px;
-  transition: height 0.25s ease, background-color 0.25s ease;
+.site-block {
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   position: relative;
   cursor: pointer;
 }
 
-.site-bar.bar-idle {
+.site-block.block-idle {
   background: rgba(255, 255, 255, 0.08);
-  height: 8%;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
-.site-bar.bar-green {
+.site-block.block-green {
   background: var(--success);
-  box-shadow: 0 0 6px var(--success-glow);
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 10px var(--success-glow);
 }
 
-.site-bar.bar-red {
+.site-block.block-red {
   background: var(--danger);
-  box-shadow: 0 0 6px var(--danger-glow);
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 10px var(--danger-glow);
 }
 
-.site-bar:hover {
-  opacity: 0.85;
-  transform: scaleY(1.05);
-  transform-origin: bottom;
+.site-block:hover {
+  transform: translateY(-2px) scale(1.06);
+  filter: brightness(1.2);
 }
 
 /* ==========================================================================

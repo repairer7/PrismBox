@@ -145,55 +145,59 @@
             </div>
           </div>
 
-          <!-- Total Traffic & Kernel Info: 3 Parallel Cards (Side-by-side, no blank space) -->
+          <!-- Total Traffic & Kernel Info: 3 Parallel Cards (Side-by-side, icons on right matching CPU stat card) -->
           <div class="dash-meta-grid mb-3">
             <!-- Total Upload Card -->
             <div class="glass-panel stat-card dash-meta-card">
-              <div class="stat-header">
+              <div class="stat-content">
                 <span class="stat-label">${I18n.t('dashboard.total_upload')}</span>
-                <div class="stat-icon-wrapper upload">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                </div>
-              </div>
-              <div class="stat-body">
                 <span class="stat-value text-purple" id="stat-total-up">${window.formatBytes(this.lastStats.totalUpload)}</span>
                 <span class="stat-subtext">${I18n.t('dashboard.total_upload_sub')}</span>
+              </div>
+              <div class="stat-icon-wrapper upload">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
               </div>
             </div>
 
             <!-- Total Download Card -->
             <div class="glass-panel stat-card dash-meta-card">
-              <div class="stat-header">
+              <div class="stat-content">
                 <span class="stat-label">${I18n.t('dashboard.total_download')}</span>
-                <div class="stat-icon-wrapper download">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                </div>
-              </div>
-              <div class="stat-body">
                 <span class="stat-value text-success" id="stat-total-down">${window.formatBytes(this.lastStats.totalDownload)}</span>
                 <span class="stat-subtext">${I18n.t('dashboard.total_download_sub')}</span>
+              </div>
+              <div class="stat-icon-wrapper download">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
               </div>
             </div>
 
             <!-- Kernel Info Card -->
             <div class="glass-panel stat-card dash-meta-card">
-              <div class="stat-header">
-                <span class="stat-label">${I18n.t('dashboard.core_info')}</span>
-                <span class="badge ${this.lastStats.kernelStatus === 'running' ? 'badge-success' : 'badge-danger'}" id="dash-kernel-badge">
-                  ${I18n.t('kernel.' + this.lastStats.kernelStatus) || this.lastStats.kernelStatus}
-                </span>
-              </div>
-              <div class="stat-body">
+              <div class="stat-content">
+                <div class="dash-meta-label-row">
+                  <span class="stat-label">${I18n.t('dashboard.core_info')}</span>
+                  <span class="badge ${this.lastStats.kernelStatus === 'running' ? 'badge-success' : 'badge-danger'}" id="dash-kernel-badge">
+                    ${I18n.t('kernel.' + this.lastStats.kernelStatus) || this.lastStats.kernelStatus}
+                  </span>
+                </div>
                 <div class="kernel-meta-version">sing-box <strong id="dash-version">${this.lastStats.kernelVersion || 'v1.14.3'}</strong></div>
                 <span class="stat-subtext">${I18n.t('dashboard.uptime')}: <strong id="dash-uptime">${window.formatUptime(this.lastStats.uptime)}</strong></span>
+              </div>
+              <div class="stat-icon-wrapper memory">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                  <line x1="6" y1="6" x2="6.01" y2="6"/>
+                  <line x1="6" y1="18" x2="6.01" y2="18"/>
+                </svg>
               </div>
             </div>
           </div>
@@ -246,16 +250,13 @@
                         <path d="M12 11c-3.5 0-6 2.2-6 5.5 0 2 1.3 3.5 3 4.2 1 .4 2 .3 3-.2 1 .5 2 .6 3 .2 1.7-.7 3-2.2 3-4.2 0-3.3-2.5-5.5-6-5.5z"/>
                       </svg>
                     </div>
-                    <div class="site-meta">
-                      <span class="site-name">${I18n.t('dashboard.site_baidu')}</span>
-                      <span class="site-host">www.baidu.com</span>
-                    </div>
+                    <span class="site-name">${I18n.t('dashboard.site_baidu')}</span>
                   </div>
                   <div class="site-val-box">
                     <span class="site-avg-val" id="site-val-baidu">-- ms</span>
                   </div>
                 </div>
-                <div class="site-bars" id="site-bars-baidu"></div>
+                <div class="site-blocks-grid" id="site-bars-baidu"></div>
               </div>
 
               <!-- Site 2: Cloudflare -->
@@ -267,16 +268,13 @@
                         <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
                       </svg>
                     </div>
-                    <div class="site-meta">
-                      <span class="site-name">${I18n.t('dashboard.site_cloudflare')}</span>
-                      <span class="site-host">cp.cloudflare.com</span>
-                    </div>
+                    <span class="site-name">${I18n.t('dashboard.site_cloudflare')}</span>
                   </div>
                   <div class="site-val-box">
                     <span class="site-avg-val" id="site-val-cloudflare">-- ms</span>
                   </div>
                 </div>
-                <div class="site-bars" id="site-bars-cloudflare"></div>
+                <div class="site-blocks-grid" id="site-bars-cloudflare"></div>
               </div>
 
               <!-- Site 3: GitHub -->
@@ -288,16 +286,13 @@
                         <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
                       </svg>
                     </div>
-                    <div class="site-meta">
-                      <span class="site-name">${I18n.t('dashboard.site_github')}</span>
-                      <span class="site-host">github.com</span>
-                    </div>
+                    <span class="site-name">${I18n.t('dashboard.site_github')}</span>
                   </div>
                   <div class="site-val-box">
                     <span class="site-avg-val" id="site-val-github">-- ms</span>
                   </div>
                 </div>
-                <div class="site-bars" id="site-bars-github"></div>
+                <div class="site-blocks-grid" id="site-bars-github"></div>
               </div>
 
               <!-- Site 4: YouTube -->
@@ -309,16 +304,13 @@
                         <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                       </svg>
                     </div>
-                    <div class="site-meta">
-                      <span class="site-name">${I18n.t('dashboard.site_youtube')}</span>
-                      <span class="site-host">www.youtube.com</span>
-                    </div>
+                    <span class="site-name">${I18n.t('dashboard.site_youtube')}</span>
                   </div>
                   <div class="site-val-box">
                     <span class="site-avg-val" id="site-val-youtube">-- ms</span>
                   </div>
                 </div>
-                <div class="site-bars" id="site-bars-youtube"></div>
+                <div class="site-blocks-grid" id="site-bars-youtube"></div>
               </div>
             </div>
           </div>
@@ -799,38 +791,40 @@
     }
 
     /**
-     * Render the 10-bar chart and average latency for a site
+     * Render the 10 square blocks and average latency for a site
      */
     updateSiteCard(siteId) {
-      const barsContainer = document.getElementById(`site-bars-${siteId}`);
+      const blocksContainer = document.getElementById(`site-bars-${siteId}`);
       const valEl = document.getElementById(`site-val-${siteId}`);
-      if (!barsContainer) return;
+      if (!blocksContainer) return;
 
       const samples = this.siteResults[siteId] || [];
 
-      // Render 10 individual bars
-      barsContainer.innerHTML = samples.map((val, idx) => {
-        let barClass = 'site-bar bar-idle';
-        let heightPct = 8;
-        let titleText = `#${idx + 1}: --`;
+      // Render 10 individual square blocks
+      blocksContainer.innerHTML = samples.map((val, idx) => {
+        let blockClass = 'site-block block-idle';
+        let titleText = I18n.currentLang === 'zh' ? `第 ${idx + 1} 次测速: 待测` : `Test #${idx + 1}: Pending`;
 
         if (val !== null) {
           if (val >= 1000) {
-            barClass = 'site-bar bar-red';
-            heightPct = 100;
-            titleText = `#${idx + 1}: ${I18n.t('dashboard.site_timeout')} (≥1000ms)`;
+            blockClass = 'site-block block-red';
+            titleText = I18n.currentLang === 'zh'
+              ? `第 ${idx + 1} 次测速: ${I18n.t('dashboard.site_timeout')} (≥1000ms)`
+              : `Test #${idx + 1}: ${I18n.t('dashboard.site_timeout')} (≥1000ms)`;
           } else if (val > 150) {
-            barClass = 'site-bar bar-red';
-            heightPct = Math.max(6, Math.min(100, Math.round((val / 1000) * 100)));
-            titleText = `#${idx + 1}: ${val} ms (>150ms)`;
+            blockClass = 'site-block block-red';
+            titleText = I18n.currentLang === 'zh'
+              ? `第 ${idx + 1} 次测速: ${val} ms (>150ms)`
+              : `Test #${idx + 1}: ${val} ms (>150ms)`;
           } else {
-            barClass = 'site-bar bar-green';
-            heightPct = Math.max(6, Math.min(100, Math.round((val / 1000) * 100)));
-            titleText = `#${idx + 1}: ${val} ms (≤150ms)`;
+            blockClass = 'site-block block-green';
+            titleText = I18n.currentLang === 'zh'
+              ? `第 ${idx + 1} 次测速: ${val} ms (≤150ms)`
+              : `Test #${idx + 1}: ${val} ms (≤150ms)`;
           }
         }
 
-        return `<div class="${barClass}" style="height: ${heightPct}%;" title="${titleText}"></div>`;
+        return `<div class="${blockClass}" title="${titleText}"></div>`;
       }).join('');
 
       // Compute and display average latency
