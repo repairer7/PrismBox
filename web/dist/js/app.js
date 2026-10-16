@@ -28,6 +28,11 @@
       subtitleKey: 'routing.subtitle',
       getController: () => window.Routing
     },
+    'connections': {
+      titleKey: 'connections.title',
+      subtitleKey: 'connections.subtitle',
+      getController: () => window.Connections
+    },
     'dns': {
       titleKey: 'dns.title',
       subtitleKey: 'dns.subtitle',

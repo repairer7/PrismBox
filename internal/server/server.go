@@ -134,11 +134,16 @@ func (s *Server) registerAPIRoutes(r *mux.Router) {
 	r.HandleFunc("/routing/rulesets/{id}", api.HandleUpdateRuleSet(store)).Methods(http.MethodPut, http.MethodOptions)
 	r.HandleFunc("/routing/rulesets/{id}", api.HandleDeleteRuleSet(store)).Methods(http.MethodDelete, http.MethodOptions)
 
-	// 5. DNS configuration
+	// 5. Live Connections (Inspection & termination via sing-box clash_api)
+	r.HandleFunc("/connections", api.HandleGetConnections(mgr)).Methods(http.MethodGet, http.MethodOptions)
+	r.HandleFunc("/connections/{id}", api.HandleCloseConnection(mgr)).Methods(http.MethodDelete, http.MethodOptions)
+	r.HandleFunc("/connections", api.HandleCloseAllConnections(mgr)).Methods(http.MethodDelete, http.MethodOptions)
+
+	// 6. DNS configuration
 	r.HandleFunc("/dns", api.HandleGetDNS(store)).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/dns", api.HandleUpdateDNS(store)).Methods(http.MethodPut, http.MethodOptions)
 
-	// 6. Sing-Box Config export, validation, import & raw
+	// 7. Sing-Box Config export, validation, import & raw
 	r.HandleFunc("/config", api.HandleGetRawConfig(store)).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/config", api.HandleImportConfig(store)).Methods(http.MethodPut, http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/config/export", api.HandleExportConfig(store)).Methods(http.MethodGet, http.MethodOptions)
