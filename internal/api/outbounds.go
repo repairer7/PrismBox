@@ -354,7 +354,11 @@ func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int
 			resp, err := client.Get(ep)
 			if err == nil {
 				_ = resp.Body.Close()
-				return int(time.Since(start).Milliseconds())
+				lat := int(time.Since(start).Milliseconds())
+				if lat <= 0 {
+					lat = 1
+				}
+				return lat
 			}
 		}
 		return -1
@@ -380,7 +384,11 @@ func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int
 		conn, err := net.DialTimeout("tcp", addr, time.Duration(timeoutSec)*time.Second)
 		if err == nil {
 			_ = conn.Close()
-			return int(time.Since(start).Milliseconds())
+			lat := int(time.Since(start).Milliseconds())
+			if lat <= 0 {
+				lat = 1
+			}
+			return lat
 		}
 	}
 

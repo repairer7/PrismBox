@@ -386,3 +386,61 @@ func TestStoreConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 }
+
+// TestStoreDeduplicationOnLoad verifies that duplicate Outbounds and Groups are deduplicated upon Load.
+func TestStoreDeduplicationOnLoad(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "prismbox-dedupe-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := NewStore(tempDir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	cfg := store.GetConfig()
+	// Deliberately introduce duplicate direct and block outbounds, and duplicate groups
+	cfg.Outbounds = append(cfg.Outbounds,
+		Outbound{ID: "dup-1", Tag: "direct", Type: "direct", Enabled: true},
+		Outbound{ID: "dup-2", Tag: "block", Type: "block", Enabled: true},
+		Outbound{ID: "dup-3", Tag: "node-1", Type: "vless", Enabled: true},
+		Outbound{ID: "dup-4", Tag: "node-1", Type: "vless", Enabled: true},
+	)
+	cfg.Groups = append(cfg.Groups,
+		Group{ID: "grp-1", Tag: "AUTO", Type: "urltest"},
+		Group{ID: "grp-2", Tag: "AUTO", Type: "selector"},
+	)
+
+	// Save raw JSON with duplicates
+	if err := store.SaveConfig(cfg); err != nil {
+		t.Fatalf("failed to save config: %v", err)
+	}
+
+	// Re-load and verify deduplication
+	if err := store.Load(); err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	loadedCfg := store.GetConfig()
+	tagCounts := make(map[string]int)
+	for _, o := range loadedCfg.Outbounds {
+		tagCounts[o.Tag]++
+	}
+	for tag, count := range tagCounts {
+		if count > 1 {
+			t.Errorf("expected tag %q to be unique, got count %d", tag, count)
+		}
+	}
+
+	grpCounts := make(map[string]int)
+	for _, g := range loadedCfg.Groups {
+		grpCounts[g.Tag]++
+	}
+	for tag, count := range grpCounts {
+		if count > 1 {
+			t.Errorf("expected group tag %q to be unique, got count %d", tag, count)
+		}
+	}
+}

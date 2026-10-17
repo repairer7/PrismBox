@@ -365,9 +365,11 @@
           });
         }
 
-        const outTags = (Array.isArray(outboundsRes) ? outboundsRes : []).map(o => o.tag);
-        const grpTags = (Array.isArray(groupsRes) ? groupsRes : []).map(g => g.tag);
-        this.availableOutbounds = ['direct', 'block', ...grpTags, ...outTags];
+        const grpTags = (Array.isArray(groupsRes) ? groupsRes : []).map(g => g && g.tag).filter(Boolean);
+        const nodeTags = (Array.isArray(outboundsRes) ? outboundsRes : [])
+          .map(o => o && o.tag)
+          .filter(tag => tag && tag !== 'direct' && tag !== 'block' && tag !== 'dns-out');
+        this.availableOutbounds = Array.from(new Set(['direct', 'block', ...grpTags, ...nodeTags]));
       } catch (err) {
         console.error('[DNS] Load error:', err);
       } finally {

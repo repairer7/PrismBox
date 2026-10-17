@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -221,9 +222,35 @@ func (s *Store) Load() error {
 	}
 	if cfg.Outbounds == nil {
 		cfg.Outbounds = make([]Outbound, 0)
+	} else {
+		// Defensive deduplication of Outbounds by Tag
+		seenOutboundTags := make(map[string]bool)
+		uniqueOutbounds := make([]Outbound, 0, len(cfg.Outbounds))
+		for _, ob := range cfg.Outbounds {
+			tag := strings.TrimSpace(ob.Tag)
+			if tag == "" || seenOutboundTags[tag] {
+				continue
+			}
+			seenOutboundTags[tag] = true
+			uniqueOutbounds = append(uniqueOutbounds, ob)
+		}
+		cfg.Outbounds = uniqueOutbounds
 	}
 	if cfg.Groups == nil {
 		cfg.Groups = make([]Group, 0)
+	} else {
+		// Defensive deduplication of Groups by Tag
+		seenGroupTags := make(map[string]bool)
+		uniqueGroups := make([]Group, 0, len(cfg.Groups))
+		for _, grp := range cfg.Groups {
+			tag := strings.TrimSpace(grp.Tag)
+			if tag == "" || seenGroupTags[tag] {
+				continue
+			}
+			seenGroupTags[tag] = true
+			uniqueGroups = append(uniqueGroups, grp)
+		}
+		cfg.Groups = uniqueGroups
 	}
 	if cfg.Routing.Rules == nil {
 		cfg.Routing.Rules = make([]Rule, 0)
