@@ -144,7 +144,8 @@ func convertClashProxy(p map[string]interface{}) (config.Outbound, error) {
 	server := getString("server")
 	port := getInt("port")
 
-	if server == "" || port == 0 {
+	hasPortHopping := (rawType == "hysteria2" || rawType == "hy2") && (p["ports"] != nil || p["server_ports"] != nil || p["mport"] != nil)
+	if server == "" || (port == 0 && !hasPortHopping) {
 		return config.Outbound{}, fmt.Errorf("missing server or port")
 	}
 
@@ -347,6 +348,34 @@ func convertClashProxy(p map[string]interface{}) (config.Outbound, error) {
 			settings["down_mbps"] = down
 		}
 
+		// Port hopping support (ports / server_ports / mport)
+		var serverPorts []string
+		if portsVal, ok := p["ports"]; ok && portsVal != nil {
+			serverPorts = parseClashPortRanges(portsVal)
+		} else if spVal, ok := p["server_ports"]; ok && spVal != nil {
+			serverPorts = parseClashPortRanges(spVal)
+		} else if mportVal, ok := p["mport"]; ok && mportVal != nil {
+			serverPorts = parseClashPortRanges(mportVal)
+		}
+		if len(serverPorts) > 0 {
+			settings["server_ports"] = serverPorts
+			if hop := getString("hop-interval", "hop_interval", "interval"); hop != "" {
+				settings["hop_interval"] = hop
+			} else {
+				settings["hop_interval"] = "30s"
+			}
+			if hopMax := getString("hop-interval-max", "hop_interval_max"); hopMax != "" {
+				settings["hop_interval_max"] = hopMax
+			}
+			if port == 0 {
+				firstRange := serverPorts[0]
+				firstPortStr := strings.Split(strings.Split(firstRange, ":")[0], "-")[0]
+				if startP, err := strconv.Atoi(strings.TrimSpace(firstPortStr)); err == nil && startP > 0 {
+					port = startP
+				}
+			}
+		}
+
 	case "tuic":
 		settings["uuid"] = getString("uuid")
 		settings["password"] = getString("password")
@@ -375,3 +404,34 @@ func convertClashProxy(p map[string]interface{}) (config.Outbound, error) {
 		Settings: settings,
 	}, nil
 }
+
+// parseClashPortRanges parses Clash Meta ports/server_ports into normalized sing-box port ranges ("20000:50000").
+func parseClashPortRanges(val interface{}) []string {
+	var res []string
+	switch v := val.(type) {
+	case string:
+		parts := strings.Split(v, ",")
+		for _, p := range parts {
+			clean := strings.ReplaceAll(strings.TrimSpace(p), "-", ":")
+			if clean != "" {
+				res = append(res, clean)
+			}
+		}
+	case []interface{}:
+		for _, item := range v {
+			if str := strings.TrimSpace(fmt.Sprintf("%v", item)); str != "" {
+				res = append(res, strings.ReplaceAll(str, "-", ":"))
+			}
+		}
+	case []string:
+		for _, item := range v {
+			if str := strings.TrimSpace(item); str != "" {
+				res = append(res, strings.ReplaceAll(str, "-", ":"))
+			}
+		}
+	case int, int64, float64:
+		res = append(res, fmt.Sprintf("%v", v))
+	}
+	return res
+}
+

@@ -139,6 +139,40 @@ func TestParseHysteria2_AllowInsecure_vs_Insecure(t *testing.T) {
 	}
 }
 
+func TestParseHysteria2_PortHopping(t *testing.T) {
+	link1 := "hy2://secret123@hy2.example.com?mport=20000:50000#Hy2Hop1"
+	out1, err := ParseLink(link1)
+	if err != nil {
+		t.Fatalf("failed to parse link1: %v", err)
+	}
+	if out1.Port != 20000 {
+		t.Errorf("expected base port 20000, got %d", out1.Port)
+	}
+	sp1, ok := out1.Settings["server_ports"].([]string)
+	if !ok || len(sp1) != 1 || sp1[0] != "20000:50000" {
+		t.Errorf("expected server_ports [20000:50000], got %+v", out1.Settings["server_ports"])
+	}
+	if out1.Settings["hop_interval"] != "30s" {
+		t.Errorf("expected default hop_interval 30s, got %v", out1.Settings["hop_interval"])
+	}
+
+	link2 := "hysteria2://secret123@hy2.example.com:443?mport=20000-20100,30000-30100&hop_interval=15s&hop_interval_max=45s#Hy2Hop2"
+	out2, err := ParseLink(link2)
+	if err != nil {
+		t.Fatalf("failed to parse link2: %v", err)
+	}
+	sp2, ok := out2.Settings["server_ports"].([]string)
+	if !ok || len(sp2) != 2 || sp2[0] != "20000:20100" || sp2[1] != "30000:30100" {
+		t.Errorf("expected 2 server_ports ranges, got %+v", out2.Settings["server_ports"])
+	}
+	if out2.Settings["hop_interval"] != "15s" {
+		t.Errorf("expected hop_interval 15s, got %v", out2.Settings["hop_interval"])
+	}
+	if out2.Settings["hop_interval_max"] != "45s" {
+		t.Errorf("expected hop_interval_max 45s, got %v", out2.Settings["hop_interval_max"])
+	}
+}
+
 func TestParseVLESS_Reality(t *testing.T) {
 	link := "vless://11111111-2222-3333-4444-555555555555@reality.example.com:443?security=reality&pbk=pubkey123&sid=shortid123&sni=reality.example.com&fp=chrome#VLESSReality"
 	out, err := ParseLink(link)

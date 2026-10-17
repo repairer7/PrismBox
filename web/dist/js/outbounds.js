@@ -423,7 +423,11 @@
                     <line x1="6" y1="18" x2="6.01" y2="18"/>
                   </svg>
                   <span class="endpoint-addr">
-                    ${node.server ? `${this.escapeHtml(node.server)}:${node.server_port || ''}` : '<span class="text-muted">Built-in Outbound</span>'}
+                    ${node.server ? (
+                      (node.type === 'hysteria2' && Array.isArray(node.settings?.server_ports) && node.settings.server_ports.length > 0)
+                        ? `${this.escapeHtml(node.server)}:<span style="color: #f472b6; font-weight: 600;">[${this.escapeHtml(node.settings.server_ports.join(','))}]</span>`
+                        : `${this.escapeHtml(node.server)}:${node.server_port || ''}`
+                    ) : '<span class="text-muted">Built-in Outbound</span>'}
                   </span>
                 `)}
               </div>
@@ -431,6 +435,14 @@
               ${node.subscription_tag ? `
                 <div class="node-sub-tag mt-1">
                   <span class="badge badge-neutral badge-sm">Sub: ${this.escapeHtml(node.subscription_tag)}</span>
+                </div>
+              ` : ''}
+
+              ${(node.type === 'hysteria2' && Array.isArray(node.settings?.server_ports) && node.settings.server_ports.length > 0) ? `
+                <div class="node-sub-tag mt-1">
+                  <span class="badge badge-hy2 badge-sm" title="${I18n.t('outbound.hy2_port_hopping')}">
+                    🔀 ${I18n.t('outbound.hy2_port_hopping')}: ${this.escapeHtml(node.settings.server_ports.join(', '))} (${node.settings.hop_interval || '30s'}${node.settings.hop_interval_max ? '~' + node.settings.hop_interval_max : ''})
+                  </span>
                 </div>
               ` : ''}
 
@@ -787,6 +799,9 @@
         settings: {}
       };
 
+      const isHy2Initial = data.type === 'hysteria2';
+      const defaultPortValue = (isHy2Initial && !data.server_port) ? '' : (data.server_port || (isHy2Initial ? '' : 443));
+
       const bodyHtml = `
         <div class="node-form-modal">
           <div class="form-row">
@@ -813,8 +828,8 @@
               <input type="text" class="form-control" id="modal-node-server" value="${this.escapeHtml(data.server || '')}" required>
             </div>
             <div class="form-group">
-              <label class="form-label">${I18n.t('outbound.port')} *</label>
-              <input type="number" class="form-control" id="modal-node-port" value="${data.server_port || 443}" min="1" max="65535" required>
+              <label class="form-label" id="modal-node-port-label">${I18n.t('outbound.port')} <span id="modal-node-port-badge" class="${isHy2Initial ? 'text-muted' : 'text-danger'}">${isHy2Initial ? `(${I18n.t('outbound.port_optional_hint')})` : '*'}</span></label>
+              <input type="number" class="form-control" id="modal-node-port" value="${defaultPortValue}" placeholder="${isHy2Initial ? I18n.t('outbound.port_placeholder_hy2') : '443'}" min="1" max="65535">
             </div>
           </div>
 
@@ -869,6 +884,32 @@
                 <input type="text" class="form-control font-mono" id="modal-node-obfs-pass" value="${this.escapeHtml(data.settings?.obfs?.password || '')}" placeholder="${I18n.t('outbound.optional_hint')}">
               </div>
             </div>
+
+            <!-- Port Hopping (server_ports) -->
+            <div class="mt-3 pt-2" style="border-top: 1px dashed rgba(236, 72, 153, 0.2);">
+              <div class="d-flex align-items-center mb-1 gap-1" style="color: #f472b6; font-size: 12px; font-weight: 600;">
+                <span>🔀 ${I18n.t('outbound.hy2_port_hopping')}</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">${I18n.t('outbound.hy2_server_ports')}</label>
+                <input type="text" class="form-control font-mono" id="modal-node-server-ports" value="${this.escapeHtml(Array.isArray(data.settings?.server_ports) ? data.settings.server_ports.join(', ') : (data.settings?.server_ports || ''))}" placeholder="20000:50000">
+                <small class="text-muted d-block mt-1">${I18n.t('outbound.hy2_server_ports_desc')}</small>
+              </div>
+
+              <div class="form-row mt-2">
+                <div class="form-group" style="flex: 1;">
+                  <label class="form-label">${I18n.t('outbound.hy2_hop_interval')}</label>
+                  <input type="text" class="form-control font-mono" id="modal-node-hop-interval" value="${this.escapeHtml(data.settings?.hop_interval || '')}" placeholder="30s">
+                  <small class="text-muted d-block mt-1">${I18n.t('outbound.hy2_hop_interval_desc')}</small>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                  <label class="form-label">${I18n.t('outbound.hy2_hop_interval_max')}</label>
+                  <input type="text" class="form-control font-mono" id="modal-node-hop-interval-max" value="${this.escapeHtml(data.settings?.hop_interval_max || '')}" placeholder="60s">
+                  <small class="text-muted d-block mt-1">${I18n.t('outbound.hy2_hop_interval_max_desc')}</small>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -882,21 +923,37 @@
           const type = document.getElementById('modal-node-type').value;
           const tag = document.getElementById('modal-node-tag').value.trim();
           const server = document.getElementById('modal-node-server').value.trim();
-          const port = parseInt(document.getElementById('modal-node-port').value, 10);
+          const portVal = document.getElementById('modal-node-port')?.value.trim();
+          const port = portVal ? parseInt(portVal, 10) : 0;
           const secret = document.getElementById('modal-node-secret').value.trim();
           const sni = document.getElementById('modal-node-sni')?.value.trim();
           const insecure = document.getElementById('modal-node-insecure')?.checked;
 
-          if (!tag || !server || !port) {
-            window.showToast('Tag, Server, and Port are required', 'error');
+          if (!tag || !server) {
+            window.showToast(I18n.t('outbound.tag_server_required'), 'error');
             return false;
+          }
+
+          const serverPortsStr = document.getElementById('modal-node-server-ports')?.value.trim();
+
+          if (type !== 'hysteria2') {
+            if (!port || isNaN(port) || port < 1 || port > 65535) {
+              window.showToast(I18n.t('outbound.port_required'), 'error');
+              return false;
+            }
+          } else {
+            const hasValidPort = port && !isNaN(port) && port >= 1 && port <= 65535;
+            if (!hasValidPort && !serverPortsStr) {
+              window.showToast(I18n.t('outbound.hy2_port_or_range_required'), 'error');
+              return false;
+            }
           }
 
           const payload = {
             tag,
             type,
             server,
-            server_port: port,
+            server_port: (port > 0) ? port : 0,
             enabled: true,
             settings: {
               ...(existing?.settings || {})
@@ -945,10 +1002,38 @@
             } else {
               delete payload.settings.obfs;
             }
+
+            const serverPortsStr = document.getElementById('modal-node-server-ports')?.value.trim();
+            const hopIntervalStr = document.getElementById('modal-node-hop-interval')?.value.trim();
+            const hopIntervalMaxStr = document.getElementById('modal-node-hop-interval-max')?.value.trim();
+
+            if (serverPortsStr) {
+              const ports = serverPortsStr.split(/[,;\s]+/).map(p => p.trim().replace(/-/g, ':')).filter(Boolean);
+              if (ports.length > 0) {
+                payload.settings.server_ports = ports;
+                payload.settings.hop_interval = hopIntervalStr || '30s';
+                if (hopIntervalMaxStr) {
+                  payload.settings.hop_interval_max = hopIntervalMaxStr;
+                } else {
+                  delete payload.settings.hop_interval_max;
+                }
+              } else {
+                delete payload.settings.server_ports;
+                delete payload.settings.hop_interval;
+                delete payload.settings.hop_interval_max;
+              }
+            } else {
+              delete payload.settings.server_ports;
+              delete payload.settings.hop_interval;
+              delete payload.settings.hop_interval_max;
+            }
           } else {
             delete payload.settings.up_mbps;
             delete payload.settings.down_mbps;
             delete payload.settings.obfs;
+            delete payload.settings.server_ports;
+            delete payload.settings.hop_interval;
+            delete payload.settings.hop_interval_max;
           }
 
           try {
@@ -969,9 +1054,31 @@
 
       const typeSelect = document.getElementById('modal-node-type');
       const hy2Section = document.getElementById('modal-hy2-section');
-      if (typeSelect && hy2Section) {
+      const portBadge = document.getElementById('modal-node-port-badge');
+      const portInput = document.getElementById('modal-node-port');
+      if (typeSelect) {
         typeSelect.addEventListener('change', () => {
-          hy2Section.style.display = (typeSelect.value === 'hysteria2') ? '' : 'none';
+          const isHy2 = typeSelect.value === 'hysteria2';
+          if (hy2Section) {
+            hy2Section.style.display = isHy2 ? '' : 'none';
+          }
+          if (portBadge) {
+            if (isHy2) {
+              portBadge.className = 'text-muted';
+              portBadge.textContent = `(${I18n.t('outbound.port_optional_hint')})`;
+            } else {
+              portBadge.className = 'text-danger';
+              portBadge.textContent = '*';
+            }
+          }
+          if (portInput) {
+            portInput.placeholder = isHy2 ? I18n.t('outbound.port_placeholder_hy2') : '443';
+            if (isHy2 && portInput.value === '443' && !isEdit) {
+              portInput.value = '';
+            } else if (!isHy2 && !portInput.value) {
+              portInput.value = '443';
+            }
+          }
         });
       }
     }

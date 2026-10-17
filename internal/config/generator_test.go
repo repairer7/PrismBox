@@ -649,3 +649,126 @@ func TestGenerateSingBoxConfig_NoDeprecatedGeoFields(t *testing.T) {
 	}
 }
 
+// TestGenerateSingBoxConfig_Hysteria2PortHopping verifies that server_ports is emitted
+// and server_port is strictly omitted to prevent conflicts in sing-box.
+func TestGenerateSingBoxConfig_Hysteria2PortHopping(t *testing.T) {
+	cfg := PrismBoxConfig{
+		Outbounds: []Outbound{
+			{
+				Tag:     "hy2-hopping",
+				Type:    "hysteria2",
+				Server:  "hy2.example.com",
+				Port:    20000, // Should be omitted from generated JSON due to server_ports
+				Enabled: true,
+				Settings: map[string]interface{}{
+					"password":         "secret123",
+					"server_ports":     []string{"20000:50000"},
+					"hop_interval":     "15s",
+					"hop_interval_max": "45s",
+				},
+			},
+			{Tag: "direct", Type: "direct", Enabled: true},
+			{Tag: "block", Type: "block", Enabled: true},
+		},
+	}
+
+	data, err := GenerateSingBoxConfigFromModel(cfg)
+	if err != nil {
+		t.Fatalf("failed to generate config: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+
+	outbounds := parsed["outbounds"].([]interface{})
+	var hy2Out map[string]interface{}
+	for _, o := range outbounds {
+		om := o.(map[string]interface{})
+		if om["tag"] == "hy2-hopping" {
+			hy2Out = om
+			break
+		}
+	}
+
+	if hy2Out == nil {
+		t.Fatalf("hy2-hopping outbound not found in generated config")
+	}
+
+	// 1. Verify server_ports is present
+	sp, ok := hy2Out["server_ports"].([]interface{})
+	if !ok || len(sp) == 0 || sp[0] != "20000:50000" {
+		t.Errorf("expected server_ports [20000:50000], got %+v", hy2Out["server_ports"])
+	}
+
+	// 2. CRITICAL: Verify server_port is NOT present (conflicts in sing-box)
+	if _, exists := hy2Out["server_port"]; exists {
+		t.Errorf("server_port MUST be omitted when server_ports is present, but found %v", hy2Out["server_port"])
+	}
+
+	// 3. Verify hop_interval and hop_interval_max
+	if hy2Out["hop_interval"] != "15s" {
+		t.Errorf("expected hop_interval 15s, got %v", hy2Out["hop_interval"])
+	}
+	if hy2Out["hop_interval_max"] != "45s" {
+		t.Errorf("expected hop_interval_max 45s, got %v", hy2Out["hop_interval_max"])
+	}
+}
+
+// TestGenerateSingBoxConfig_Hysteria2PortHopping_ZeroPort verifies that when Port is 0 (omitted single port),
+// sing-box config still generates successfully with server_ports and no server_port.
+func TestGenerateSingBoxConfig_Hysteria2PortHopping_ZeroPort(t *testing.T) {
+	cfg := PrismBoxConfig{
+		Outbounds: []Outbound{
+			{
+				Tag:     "hy2-no-single-port",
+				Type:    "hysteria2",
+				Server:  "hy2.example.com",
+				Port:    0, // Zero / omitted single port because port hopping is configured
+				Enabled: true,
+				Settings: map[string]interface{}{
+					"password":     "secret123",
+					"server_ports": []string{"20000:50000"},
+				},
+			},
+			{Tag: "direct", Type: "direct", Enabled: true},
+			{Tag: "block", Type: "block", Enabled: true},
+		},
+	}
+
+	data, err := GenerateSingBoxConfigFromModel(cfg)
+	if err != nil {
+		t.Fatalf("failed to generate config: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+
+	outbounds := parsed["outbounds"].([]interface{})
+	var hy2Out map[string]interface{}
+	for _, o := range outbounds {
+		om := o.(map[string]interface{})
+		if om["tag"] == "hy2-no-single-port" {
+			hy2Out = om
+			break
+		}
+	}
+
+	if hy2Out == nil {
+		t.Fatalf("hy2-no-single-port outbound not found in generated config")
+	}
+
+	sp, ok := hy2Out["server_ports"].([]interface{})
+	if !ok || len(sp) == 0 || sp[0] != "20000:50000" {
+		t.Errorf("expected server_ports [20000:50000], got %+v", hy2Out["server_ports"])
+	}
+
+	if _, exists := hy2Out["server_port"]; exists {
+		t.Errorf("server_port must NOT exist when port is 0 and server_ports is present, but found %v", hy2Out["server_port"])
+	}
+}
+
+

@@ -144,9 +144,6 @@ func parseHysteria2Link(rawURI string) (config.Outbound, error) {
 
 	server := u.Hostname()
 	port, _ := strconv.Atoi(u.Port())
-	if port == 0 {
-		port = 443
-	}
 
 	// Extract and decode password from userinfo
 	var password string
@@ -172,9 +169,6 @@ func parseHysteria2Link(rawURI string) (config.Outbound, error) {
 		if unescaped, err := url.QueryUnescape(tag); err == nil {
 			tag = unescaped
 		}
-	}
-	if tag == "" {
-		tag = fmt.Sprintf("hy2-%s:%d", server, port)
 	}
 
 	q := u.Query()
@@ -241,6 +235,73 @@ func parseHysteria2Link(rawURI string) (config.Outbound, error) {
 		if downInt, err := strconv.Atoi(strings.TrimSpace(downVal)); err == nil {
 			settings["down_mbps"] = downInt
 		}
+	}
+
+	// Port hopping support (mport, server_ports, ports query params)
+	var serverPorts []string
+	mportQuery := q.Get("mport")
+	if mportQuery == "" {
+		mportQuery = q.Get("server_ports")
+	}
+	if mportQuery == "" {
+		mportQuery = q.Get("ports")
+	}
+	if mportQuery != "" {
+		parts := strings.FieldsFunc(mportQuery, func(r rune) bool {
+			return r == ',' || r == ';'
+		})
+		for _, p := range parts {
+			clean := strings.ReplaceAll(strings.TrimSpace(p), "-", ":")
+			if clean != "" {
+				serverPorts = append(serverPorts, clean)
+			}
+		}
+		if len(serverPorts) > 0 {
+			settings["server_ports"] = serverPorts
+		}
+	}
+
+	hopInterval := q.Get("hop_interval")
+	if hopInterval == "" {
+		hopInterval = q.Get("hopInterval")
+	}
+	if hopInterval == "" {
+		hopInterval = q.Get("interval")
+	}
+	if hopInterval != "" {
+		settings["hop_interval"] = hopInterval
+	} else if len(serverPorts) > 0 {
+		settings["hop_interval"] = "30s"
+	}
+
+	hopIntervalMax := q.Get("hop_interval_max")
+	if hopIntervalMax == "" {
+		hopIntervalMax = q.Get("hopIntervalMax")
+	}
+	if hopIntervalMax != "" {
+		settings["hop_interval_max"] = hopIntervalMax
+	}
+
+	// Clean and normalize each port range (ensure ':' is used for sing-box port range)
+	for i := range serverPorts {
+		serverPorts[i] = strings.ReplaceAll(strings.TrimSpace(serverPorts[i]), "-", ":")
+	}
+
+	// If port hopping is present, extract base port from first range if port wasn't set
+	if len(serverPorts) > 0 && port == 0 {
+		firstRange := serverPorts[0]
+		firstPortStr := strings.Split(strings.Split(firstRange, ":")[0], "-")[0]
+		if startP, err := strconv.Atoi(strings.TrimSpace(firstPortStr)); err == nil && startP > 0 {
+			port = startP
+		}
+	}
+
+	if port == 0 && len(serverPorts) == 0 {
+		port = 443
+	}
+
+	if tag == "" {
+		tag = fmt.Sprintf("hy2-%s:%d", server, port)
 	}
 
 	return config.Outbound{

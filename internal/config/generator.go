@@ -267,8 +267,43 @@ func GenerateSingBoxConfigFromModel(cfg PrismBoxConfig) ([]byte, error) {
 		if out.Server != "" {
 			outMap["server"] = out.Server
 		}
-		if out.Port > 0 {
-			outMap["server_port"] = out.Port
+
+		serverPorts := extractServerPorts(out.Settings["server_ports"])
+		if len(serverPorts) > 0 {
+			outMap["server_ports"] = serverPorts
+			// In sing-box, server_ports conflicts with server_port. Explicitly remove server_port.
+			delete(outMap, "server_port")
+
+			// Ensure hop_interval (default 30s)
+			if hop, ok := out.Settings["hop_interval"]; ok && hop != nil {
+				hopStr := strings.TrimSpace(fmt.Sprintf("%v", hop))
+				if _, err := strconv.Atoi(hopStr); err == nil {
+					hopStr += "s"
+				}
+				if hopStr != "" {
+					outMap["hop_interval"] = hopStr
+				}
+			} else {
+				outMap["hop_interval"] = "30s"
+			}
+
+			// Optional hop_interval_max for randomized port hopping (sing-box 1.14+)
+			if hopMax, ok := out.Settings["hop_interval_max"]; ok && hopMax != nil {
+				hopMaxStr := strings.TrimSpace(fmt.Sprintf("%v", hopMax))
+				if _, err := strconv.Atoi(hopMaxStr); err == nil {
+					hopMaxStr += "s"
+				}
+				if hopMaxStr != "" {
+					outMap["hop_interval_max"] = hopMaxStr
+				}
+			}
+		} else {
+			delete(outMap, "server_ports")
+			delete(outMap, "hop_interval")
+			delete(outMap, "hop_interval_max")
+			if out.Port > 0 {
+				outMap["server_port"] = out.Port
+			}
 		}
 
 		existingTags[out.Tag] = true
@@ -656,4 +691,40 @@ func dedupeStrings(slice []string) []string {
 	}
 	return res
 }
+
+// extractServerPorts normalizes server_ports from outbound settings into a string slice of port ranges (using colon delimiter e.g. "20000:50000").
+func extractServerPorts(val interface{}) []string {
+	if val == nil {
+		return nil
+	}
+	var res []string
+	switch v := val.(type) {
+	case []string:
+		for _, s := range v {
+			trimmed := strings.ReplaceAll(strings.TrimSpace(s), "-", ":")
+			if trimmed != "" {
+				res = append(res, trimmed)
+			}
+		}
+	case []interface{}:
+		for _, s := range v {
+			trimmed := strings.ReplaceAll(strings.TrimSpace(fmt.Sprintf("%v", s)), "-", ":")
+			if trimmed != "" {
+				res = append(res, trimmed)
+			}
+		}
+	case string:
+		parts := strings.Split(v, ",")
+		for _, s := range parts {
+			trimmed := strings.ReplaceAll(strings.TrimSpace(s), "-", ":")
+			if trimmed != "" {
+				res = append(res, trimmed)
+			}
+		}
+	case int, int64, float64:
+		res = append(res, fmt.Sprintf("%v", v))
+	}
+	return dedupeStrings(res)
+}
+
 

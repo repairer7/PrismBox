@@ -21,7 +21,7 @@ import (
 
 // Build metadata injected via ldflags
 var (
-	Version   = "1.4.0"
+	Version   = "1.5.0"
 	BuildTime = ""
 	Commit    = ""
 )

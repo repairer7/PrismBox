@@ -342,3 +342,43 @@ proxies:
 		t.Errorf("expected error for empty URL")
 	}
 }
+
+func TestParseClash_Hysteria2PortHopping(t *testing.T) {
+	yamlContent := `
+proxies:
+  - name: "Hy2-Hopping-Clash"
+    type: hysteria2
+    server: 1.2.3.4
+    port: 0
+    password: "mypassword"
+    ports: 20000-50000
+    hop-interval: 15s
+`
+	nodes, err := ParseClash([]byte(yamlContent))
+	if err != nil {
+		t.Fatalf("failed to parse clash config: %v", err)
+	}
+
+	if len(nodes) != 1 {
+		t.Fatalf("expected 1 node, got %d", len(nodes))
+	}
+
+	node := nodes[0]
+	if node.Tag != "Hy2-Hopping-Clash" {
+		t.Errorf("expected tag Hy2-Hopping-Clash, got %s", node.Tag)
+	}
+
+	if node.Port != 20000 {
+		t.Errorf("expected extracted base port 20000, got %d", node.Port)
+	}
+
+	sp, ok := node.Settings["server_ports"].([]string)
+	if !ok || len(sp) != 1 || sp[0] != "20000:50000" {
+		t.Errorf("expected server_ports [20000:50000], got %+v", node.Settings["server_ports"])
+	}
+
+	if node.Settings["hop_interval"] != "15s" {
+		t.Errorf("expected hop_interval 15s, got %v", node.Settings["hop_interval"])
+	}
+}
+

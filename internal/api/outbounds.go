@@ -278,7 +278,8 @@ func HandleSpeedTest(store *config.Store) http.HandlerFunc {
 		var targets []config.Outbound
 		for _, out := range allOutbounds {
 			if len(req.IDs) == 0 || targetMap[out.ID] {
-				if (out.Server != "" && out.Port > 0) || strings.EqualFold(out.Type, "direct") {
+				hasPort := out.Port > 0 || extractStartPort(out.Settings["server_ports"]) > 0
+				if (out.Server != "" && hasPort) || strings.EqualFold(out.Type, "direct") {
 					targets = append(targets, out)
 				}
 			}
@@ -370,29 +371,67 @@ func testSingleOutbound(outbound config.Outbound, testURL string, timeoutSec int
 	}
 
 	// 3. Native Latency Probe for proxy nodes:
-	if outbound.Server != "" && outbound.Port > 0 {
-		// For QUIC UDP-based protocols (Hysteria 2, TUIC), perform a fast RFC 9000 QUIC probe
-		if outType == "hysteria2" || outType == "hy2" || outType == "tuic" {
-			if l := testQUICLatency(outbound.Server, outbound.Port, timeoutSec); l > 0 {
-				return l
-			}
+	if outbound.Server != "" {
+		probePort := outbound.Port
+		if probePort <= 0 {
+			probePort = extractStartPort(outbound.Settings["server_ports"])
 		}
 
-		// Direct TCP handshake for TCP-based proxy protocols
-		addr := net.JoinHostPort(outbound.Server, strconv.Itoa(outbound.Port))
-		start := time.Now()
-		conn, err := net.DialTimeout("tcp", addr, time.Duration(timeoutSec)*time.Second)
-		if err == nil {
-			_ = conn.Close()
-			lat := int(time.Since(start).Milliseconds())
-			if lat <= 0 {
-				lat = 1
+		if probePort > 0 {
+			// For QUIC UDP-based protocols (Hysteria 2, TUIC), perform a fast RFC 9000 QUIC probe
+			if outType == "hysteria2" || outType == "hy2" || outType == "tuic" {
+				if l := testQUICLatency(outbound.Server, probePort, timeoutSec); l > 0 {
+					return l
+				}
 			}
-			return lat
+
+			// Direct TCP handshake for TCP-based proxy protocols
+			addr := net.JoinHostPort(outbound.Server, strconv.Itoa(probePort))
+			start := time.Now()
+			conn, err := net.DialTimeout("tcp", addr, time.Duration(timeoutSec)*time.Second)
+			if err == nil {
+				_ = conn.Close()
+				lat := int(time.Since(start).Milliseconds())
+				if lat <= 0 {
+					lat = 1
+				}
+				return lat
+			}
 		}
 	}
 
 	return -1
+}
+
+// extractStartPort extracts the start integer port from a server_ports setting (string, []string, []interface{}).
+func extractStartPort(val interface{}) int {
+	if val == nil {
+		return 0
+	}
+	var firstStr string
+	switch v := val.(type) {
+	case []string:
+		if len(v) > 0 {
+			firstStr = v[0]
+		}
+	case []interface{}:
+		if len(v) > 0 {
+			firstStr = fmt.Sprintf("%v", v[0])
+		}
+	case string:
+		parts := strings.Split(v, ",")
+		if len(parts) > 0 {
+			firstStr = parts[0]
+		}
+	}
+	firstStr = strings.TrimSpace(firstStr)
+	if firstStr == "" {
+		return 0
+	}
+	firstStr = strings.ReplaceAll(firstStr, "-", ":")
+	rangeParts := strings.Split(firstStr, ":")
+	p, _ := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
+	return p
 }
 
 // testQUICLatency sends a standard RFC 9000 QUIC version negotiation probe to measure UDP RTT.
